@@ -61,6 +61,19 @@ class CustomUser(AbstractUser):
         help_text='Firebase Cloud Messaging token for push notifications.',
     )
 
+    # ── Security & Recovery ─────────────────────────────────
+    reset_code = models.CharField(
+        max_length=6,
+        blank=True,
+        null=True,
+        help_text='6-digit code for password recovery.',
+    )
+    reset_code_expires_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        help_text='Expiration time for the reset code.',
+    )
+
     # ── Timestamps ──────────────────────────────────────────
     updated_at = models.DateTimeField(auto_now=True)
 

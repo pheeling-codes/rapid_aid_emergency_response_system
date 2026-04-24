@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 /// [isEmergency] = false → Primary Blue (#005EB8)
 class ActionButton extends StatefulWidget {
   final String label;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final bool isEmergency;
   final bool isLoading;
   final IconData? icon;
@@ -13,7 +13,7 @@ class ActionButton extends StatefulWidget {
   const ActionButton({
     Key? key,
     required this.label,
-    required this.onPressed,
+    this.onPressed,
     this.isEmergency = true,
     this.isLoading = false,
     this.icon,
@@ -52,14 +52,15 @@ class _ActionButtonState extends State<ActionButton>
     final cs = theme.colorScheme;
 
     final bgColor = widget.isEmergency ? cs.tertiary : cs.primary;
+    final isDisabled = widget.onPressed == null || widget.isLoading;
 
     return GestureDetector(
-      onTapDown: (_) => _controller.forward(),
-      onTapUp: (_) {
+      onTapDown: isDisabled ? null : (_) => _controller.forward(),
+      onTapUp: isDisabled ? null : (_) {
         _controller.reverse();
-        if (!widget.isLoading) widget.onPressed();
+        widget.onPressed!();
       },
-      onTapCancel: () => _controller.reverse(),
+      onTapCancel: isDisabled ? null : () => _controller.reverse(),
       child: ScaleTransition(
         scale: _scaleAnimation,
         child: AnimatedContainer(
@@ -67,7 +68,7 @@ class _ActionButtonState extends State<ActionButton>
           height: 56,
           width: double.infinity,
           decoration: BoxDecoration(
-            color: widget.isLoading ? bgColor.withOpacity(0.8) : bgColor,
+            color: widget.onPressed == null ? bgColor.withOpacity(0.4) : (widget.isLoading ? bgColor.withOpacity(0.8) : bgColor),
             borderRadius: BorderRadius.circular(24),
           ),
           alignment: Alignment.center,

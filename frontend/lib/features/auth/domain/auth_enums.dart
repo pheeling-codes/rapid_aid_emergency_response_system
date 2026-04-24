@@ -14,6 +14,19 @@ extension UserRoleLabel on UserRole {
     }
   }
 
+  /// Maps frontend role to the Django backend `CustomUser.Role` value.
+  /// admin → DISPATCHER (backend has no ADMIN role).
+  String get backendRole {
+    switch (this) {
+      case UserRole.citizen:
+        return 'CITIZEN';
+      case UserRole.responder:
+        return 'RESPONDER';
+      case UserRole.admin:
+        return 'DISPATCHER';
+    }
+  }
+
   String get splashMessage {
     switch (this) {
       case UserRole.citizen:
@@ -30,9 +43,9 @@ extension UserRoleLabel on UserRole {
       case UserRole.citizen:
         return 'CITIZEN PORTAL';
       case UserRole.responder:
-        return 'RESPONDER PORTAL';
+        return 'RESPONDER UNIT';
       case UserRole.admin:
-        return 'ADMIN PORTAL';
+        return 'ADMIN COMMAND CENTER';
     }
   }
 
@@ -44,6 +57,20 @@ extension UserRoleLabel on UserRole {
         return '/responder';
       case UserRole.admin:
         return '/admin';
+    }
+  }
+
+  /// Parses a backend role string (e.g., 'DISPATCHER') into a [UserRole].
+  static UserRole fromBackendRole(String backendRole) {
+    switch (backendRole.toUpperCase()) {
+      case 'CITIZEN':
+        return UserRole.citizen;
+      case 'RESPONDER':
+        return UserRole.responder;
+      case 'DISPATCHER':
+        return UserRole.admin;
+      default:
+        return UserRole.citizen;
     }
   }
 }

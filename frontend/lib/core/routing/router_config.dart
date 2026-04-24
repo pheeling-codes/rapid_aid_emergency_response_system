@@ -1,19 +1,38 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../widgets/rapid_aid_logo.dart';
+
 import '../../features/auth/domain/auth_enums.dart';
+import '../../features/auth/logic/auth_bloc.dart';
+import '../../features/auth/logic/auth_event.dart';
+import '../../features/auth/logic/auth_state.dart';
 import '../../features/auth/presentation/splash_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/signup_screen.dart';
 import '../../features/auth/presentation/forgot_password_screen.dart';
 import '../../features/auth/presentation/role_splash_screen.dart';
+import '../../features/auth/presentation/verification_screen.dart';
+import '../../features/auth/presentation/reset_password_screen.dart';
+import '../../features/auth/presentation/security_updated_splash.dart';
 
+/// GoRouter configuration with RBAC navigation guards.
+///
+/// Guards enforce:
+/// - Unauthenticated users are blocked from dashboard routes
+/// - CITIZEN cannot access /responder or /admin
+/// - RESPONDER cannot access /admin or /citizen
+/// - DISPATCHER/ADMIN cannot access /citizen or /responder
 class AppRouter {
-  static final _rootNavigatorKey = GlobalKey<NavigatorState>();
+  final AuthBloc authBloc;
 
-  static final GoRouter router = GoRouter(
-    navigatorKey: _rootNavigatorKey,
+  AppRouter({required this.authBloc});
+
+  late final GoRouter router = GoRouter(
     initialLocation: '/splash',
+    refreshListenable: GoRouterRefreshStream(authBloc.stream),
+    redirect: _guardRedirect,
     routes: [
       // ── Stage 1: Universal Splash ──
       GoRoute(
@@ -55,6 +74,32 @@ class AppRouter {
             return FadeTransition(opacity: animation, child: child);
           },
         ),
+      ),
+
+      // ── Stage 2d: Verify Code ──
+      GoRoute(
+        path: '/verify-code',
+        builder: (context, state) {
+          final email = state.extra as String? ?? '';
+          return VerificationScreen(email: email);
+        },
+      ),
+
+      // ── Stage 2e: Reset Password ──
+      GoRoute(
+        path: '/reset-password',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          final email = extra['email'] as String? ?? '';
+          final code = extra['code'] as String? ?? '';
+          return ResetPasswordScreen(email: email, code: code);
+        },
+      ),
+
+      // ── Stage 2f: Security Updated Splash ──
+      GoRoute(
+        path: '/security-splash',
+        builder: (context, state) => const SecurityUpdatedSplash(),
       ),
 
       // ── Stage 3: Role-Specific Handshake ──
@@ -100,6 +145,74 @@ class AppRouter {
       ),
     ],
   );
+
+  /// RBAC navigation guard.
+  /// Blocks unauthenticated access to dashboards.
+  /// Blocks cross-role access (e.g., CITIZEN trying to reach /admin).
+  String? _guardRedirect(BuildContext context, GoRouterState state) {
+    final authState = authBloc.state;
+    final location = state.matchedLocation;
+    final isAuthenticated = authState.status == AuthStatus.authenticated;
+
+    // Public routes that don't require auth
+    const publicPaths = [
+      '/splash',
+      '/login',
+      '/signup',
+      '/forgot-password',
+      '/verify-code',
+      '/reset-password',
+      '/security-splash',
+    ];
+    final isPublicRoute = publicPaths.contains(location);
+    final isRoleSplash = location.startsWith('/role-splash');
+
+    // Don't redirect during initial/loading states
+    if (authState.status == AuthStatus.initial ||
+        authState.status == AuthStatus.loading) {
+      return null;
+    }
+
+    // Unauthenticated trying to access protected route
+    if (!isAuthenticated && !isPublicRoute && !isRoleSplash) {
+      return '/login';
+    }
+
+    // Authenticated trying to access auth routes (already logged in)
+    if (isAuthenticated && isPublicRoute && location != '/splash') {
+      return '/role-splash/${authState.selectedRole.name}';
+    }
+
+    // RBAC: Check role-specific route access
+    if (isAuthenticated && !isPublicRoute && !isRoleSplash) {
+      final role = authState.selectedRole;
+      final allowedRoute = role.dashboardRoute;
+
+      // Block cross-role access to dashboard routes
+      const dashboardPaths = ['/citizen', '/responder', '/admin'];
+      if (dashboardPaths.contains(location) && location != allowedRoute) {
+        return allowedRoute;
+      }
+    }
+
+    return null; // No redirect needed
+  }
+}
+
+/// Adapts a Stream to a Listenable for GoRouter's refreshListenable.
+class GoRouterRefreshStream extends ChangeNotifier {
+  GoRouterRefreshStream(Stream stream) {
+    notifyListeners();
+    _subscription = stream.asBroadcastStream().listen((_) => notifyListeners());
+  }
+
+  late final dynamic _subscription;
+
+  @override
+  void dispose() {
+    _subscription.cancel();
+    super.dispose();
+  }
 }
 
 /// Temporary dashboard placeholder until feature screens are built.
@@ -120,19 +233,7 @@ class _DashboardPlaceholder extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: cs.primary,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              alignment: Alignment.center,
-              child: const Text(
-                '✳',
-                style: TextStyle(color: Colors.white, fontSize: 32),
-              ),
-            ),
+            const RapidAidLogo(size: 64, iconSize: 32),
             const SizedBox(height: 24),
             Text(
               title,
@@ -148,7 +249,10 @@ class _DashboardPlaceholder extends StatelessWidget {
             ),
             const SizedBox(height: 32),
             TextButton.icon(
-              onPressed: () => context.go('/login'),
+              onPressed: () {
+                context.read<AuthBloc>().add(const AuthLogoutRequested());
+                context.go('/login');
+              },
               icon: const Icon(Icons.logout_outlined, size: 18),
               label: const Text('Sign Out'),
             ),

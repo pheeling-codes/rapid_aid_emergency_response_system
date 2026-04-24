@@ -9,6 +9,7 @@ import '../logic/auth_state.dart';
 import '../../../core/widgets/auth_text_field.dart';
 import '../../../core/widgets/action_button.dart';
 import '../../../core/widgets/role_segmented_control.dart';
+import '../../../core/widgets/rapid_aid_logo.dart';
 
 /// Stage 2: Universal Login
 /// Matches the universal_login.png design:
@@ -92,40 +93,28 @@ class _LoginScreenState extends State<LoginScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: Column(
                     children: [
-                      // App brand header
+                      // Brand
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: cs.primary,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            alignment: Alignment.center,
-                            child: const Text(
-                              '✳',
-                              style: TextStyle(color: Colors.white, fontSize: 18),
-                            ),
-                          ),
+                          const RapidAidLogo(),
                           const SizedBox(width: 10),
                           Text(
                             'Rapid Aid',
-                            style: theme.textTheme.titleLarge?.copyWith(
+                            style: theme.textTheme.headlineLarge?.copyWith(
                               color: cs.primary,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 30),
 
                       // Main card
                       Container(
                         width: double.infinity,
                         constraints: const BoxConstraints(maxWidth: 440),
-                        padding: const EdgeInsets.all(32),
+                        padding: const EdgeInsets.all(28),
                         decoration: BoxDecoration(
                           color: cs.surfaceContainerLowest,
                           borderRadius: BorderRadius.circular(16),
@@ -133,48 +122,25 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            // Icon
-                            Container(
-                              width: 56,
-                              height: 56,
-                              decoration: BoxDecoration(
-                                color: cs.primary,
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              alignment: Alignment.center,
-                              child: const Text(
-                                '✳',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 28,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 20),
                             Text(
-                              'Welcome Back',
-                              style: theme.textTheme.headlineMedium,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Access your critical dashboard',
-                              style: theme.textTheme.bodyLarge?.copyWith(
+                              'LOGIN',
+                              style: theme.textTheme.headlineMedium?.copyWith(
                                 color: cs.onSurface.withOpacity(0.55),
                               ),
                             ),
-                            const SizedBox(height: 28),
+                            const SizedBox(height: 35),
 
                             // Access Level label
                             Align(
                               alignment: Alignment.centerLeft,
                               child: Text(
-                                'ACCESS LEVEL',
+                                'ROLE-BASED-ACCESS',
                                 style: theme.textTheme.labelMedium?.copyWith(
                                   letterSpacing: 1.0,
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 12),
                             RoleSegmentedControl(
                               selectedRole: _selectedRole,
                               onRoleChanged: (role) {
@@ -189,6 +155,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               hintText: 'Email Address',
                               controller: _emailController,
                               keyboardType: TextInputType.emailAddress,
+                              forceLowercase: true,
                             ),
                             const SizedBox(height: 16),
 
@@ -238,9 +205,24 @@ class _LoginScreenState extends State<LoginScreen> {
                               isEmergency: true,
                               isLoading: isLoading,
                               onPressed: () {
+                                final email = _emailController.text.trim();
+                                if (email.isNotEmpty && email != email.toLowerCase()) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: const Text('Email must be in strictly lowercase letters.'),
+                                      backgroundColor: cs.error,
+                                      behavior: SnackBarBehavior.floating,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                  );
+                                  return;
+                                }
+
                                 context.read<AuthBloc>().add(
                                       AuthLoginRequested(
-                                        email: _emailController.text.trim(),
+                                        email: email,
                                         password: _passwordController.text,
                                         role: _selectedRole,
                                       ),
@@ -248,19 +230,6 @@ class _LoginScreenState extends State<LoginScreen> {
                               },
                             ),
                             const SizedBox(height: 20),
-
-                            // Verify email
-                            TextButton(
-                              onPressed: () {},
-                              child: Text(
-                                'Verify Email',
-                                style: theme.textTheme.bodyLarge?.copyWith(
-                                  color: cs.primary,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
 
                             // Divider using surface shift (no hard line)
                             Container(
@@ -274,7 +243,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Text(
-                                  'New to the framework? ',
+                                  'Don\'t have an account? ',
                                   style: theme.textTheme.bodyLarge?.copyWith(
                                     fontSize: 14,
                                     color: cs.onSurface.withOpacity(0.6),
@@ -283,7 +252,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 GestureDetector(
                                   onTap: () => context.go('/signup'),
                                   child: Text(
-                                    'Request Access',
+                                    'Create One',
                                     style: theme.textTheme.bodyLarge?.copyWith(
                                       fontSize: 14,
                                       color: cs.primary,
@@ -296,37 +265,25 @@ class _LoginScreenState extends State<LoginScreen> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 40),
+
+                      const SizedBox(height: 60),
 
                       // Footer
-                      Wrap(
-                        alignment: WrapAlignment.center,
-                        spacing: 24,
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(
-                            'TERMS OF SERVICE',
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              color: cs.onSurface.withOpacity(0.4),
-                              letterSpacing: 1.0,
-                            ),
-                          ),
-                          Text(
-                            'PRIVACY POLICY',
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              color: cs.onSurface.withOpacity(0.4),
-                              letterSpacing: 1.0,
-                            ),
-                          ),
-                          Text(
-                            'CONTACT SUPPORT',
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              color: cs.onSurface.withOpacity(0.4),
-                              letterSpacing: 1.0,
+                          Center(
+                            child: Text(
+                              '© 2026 RAPID AID.   AI AIDED EMERGENCY RESPONSE SYSTEM',
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                color: cs.onSurface.withOpacity(0.35),
+                                letterSpacing: 0.8,
+                                fontSize: 12,
+                              ),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 24),
                     ],
                   ),
                 ),

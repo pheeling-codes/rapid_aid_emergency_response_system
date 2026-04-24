@@ -92,7 +92,7 @@ class AppTheme {
         ),
         contentPadding: EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       ),
-      cardTheme: const CardTheme(
+      cardTheme: const CardThemeData(
         color: surfaceContainerLowest,
         elevation: 0, // Disable standard drop shadows
         margin: EdgeInsets.zero,

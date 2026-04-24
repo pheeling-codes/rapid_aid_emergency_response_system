@@ -7,6 +7,7 @@ import '../logic/auth_event.dart';
 import '../logic/auth_state.dart';
 import '../../../core/widgets/auth_text_field.dart';
 import '../../../core/widgets/action_button.dart';
+import '../../../core/widgets/rapid_aid_logo.dart';
 
 /// Forgot Password screen matching forgot_password_screen.png.
 /// - Logo + Red accent bar
@@ -24,9 +25,25 @@ class ForgotPasswordScreen extends StatefulWidget {
 
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _emailController = TextEditingController();
+  bool _isEmailValid = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _emailController.addListener(_validateEmail);
+  }
+
+  void _validateEmail() {
+    final text = _emailController.text;
+    final regex = RegExp(r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+-/=?^_`{|}~]+@[a-zA-Z0-9]+\.[a-zA-Z]+");
+    setState(() {
+      _isEmailValid = text.trim().isNotEmpty && regex.hasMatch(text.trim());
+    });
+  }
 
   @override
   void dispose() {
+    _emailController.removeListener(_validateEmail);
     _emailController.dispose();
     super.dispose();
   }
@@ -39,10 +56,19 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     return BlocConsumer<AuthBloc, AuthState>(
       listener: (context, state) {
         if (state.status == AuthStatus.failure && state.errorMessage != null) {
+          final isNotFound = state.errorMessage == 'Email not found. Please check and try again.';
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(state.errorMessage!),
-              backgroundColor: cs.error,
+              content: Row(
+                children: [
+                  if (isNotFound) ...[
+                    const Icon(Icons.error_outline, color: Colors.white),
+                    const SizedBox(width: 8),
+                  ],
+                  Expanded(child: Text(state.errorMessage!)),
+                ],
+              ),
+              backgroundColor: isNotFound ? const Color(0xFFD32F2F) : cs.error,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -51,16 +77,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           );
         }
         if (state.status == AuthStatus.resetSent) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(state.successMessage ?? 'Reset link sent'),
-              backgroundColor: Colors.green.shade700,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          );
+          context.go('/verify-code', extra: _emailController.text);
         }
       },
       builder: (context, state) {
@@ -75,6 +92,29 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: Column(
                     children: [
+                      // Brand
+                      Center(
+                        child: Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const RapidAidLogo(),
+                                const SizedBox(width: 10),
+                                Text(
+                                  'Rapid Aid',
+                                  style: theme.textTheme.headlineLarge?.copyWith(
+                                    color: cs.primary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 28),
                       // Main card
                       Container(
                         width: double.infinity,
@@ -85,60 +125,27 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            // Brand centered
                             Center(
                               child: Column(
                                 children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        '✳',
-                                        style: TextStyle(
-                                          fontSize: 28,
-                                          color: cs.primary,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'Rapid Aid',
-                                        style:
-                                            theme.textTheme.titleLarge?.copyWith(
-                                          color: cs.primary,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                    ],
+                                  Text(
+                                    'Forgot Password',
+                                    style: theme.textTheme.headlineMedium,
                                   ),
                                   const SizedBox(height: 8),
-                                  // Red accent bar
-                                  Container(
-                                    width: 48,
-                                    height: 3,
-                                    decoration: BoxDecoration(
-                                      color: cs.tertiary,
-                                      borderRadius: BorderRadius.circular(2),
+                                  Text(
+                                    'Enter your email to receive a secure password reset link.',
+                                    textAlign: TextAlign.center,
+                                    style: theme.textTheme.bodyLarge?.copyWith(
+                                      color: cs.onSurface.withOpacity(0.55),
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                            const SizedBox(height: 28),
-
-                            Text(
-                              'Forgot Password',
-                              style: theme.textTheme.headlineMedium,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Enter your email to receive a secure password reset link.',
-                              style: theme.textTheme.bodyLarge?.copyWith(
-                                color: cs.onSurface.withOpacity(0.55),
-                              ),
-                            ),
-                            const SizedBox(height: 28),
+                            const SizedBox(height: 20),
 
                             // Email field
                             AuthTextField(
@@ -146,6 +153,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                               hintText: 'name@organization.com',
                               controller: _emailController,
                               keyboardType: TextInputType.emailAddress,
+                              forceLowercase: true,
                             ),
                             const SizedBox(height: 24),
 
@@ -155,13 +163,30 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                               icon: Icons.history,
                               isEmergency: true,
                               isLoading: isLoading,
-                              onPressed: () {
-                                context.read<AuthBloc>().add(
-                                      AuthForgotPasswordRequested(
-                                        email: _emailController.text.trim(),
-                                      ),
-                                    );
-                              },
+                              onPressed: _isEmailValid
+                                  ? () {
+                                      final email = _emailController.text.trim();
+                                      if (email.isNotEmpty && email != email.toLowerCase()) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: const Text('Email must be in strictly lowercase letters.'),
+                                            backgroundColor: cs.error,
+                                            behavior: SnackBarBehavior.floating,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(12),
+                                            ),
+                                          ),
+                                        );
+                                        return;
+                                      }
+                                      
+                                      context.read<AuthBloc>().add(
+                                            AuthForgotPasswordRequested(
+                                              email: email,
+                                            ),
+                                          );
+                                    }
+                                  : null,
                             ),
                             const SizedBox(height: 24),
 
@@ -198,47 +223,20 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
                       // Footer
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Flexible(
+                          Center(
                             child: Text(
-                              '© 2024 RAPID AID FRAMEWORK. CLINICAL PRECISION SYSTEM.',
+                              '© 2026 RAPID AID.   AI AIDED EMERGENCY RESPONSE SYSTEM',
                               style: theme.textTheme.labelMedium?.copyWith(
                                 color: cs.onSurface.withOpacity(0.35),
                                 letterSpacing: 0.8,
-                                fontSize: 10,
+                                fontSize: 12,
                               ),
                             ),
                           ),
-                          Wrap(
-                            spacing: 16,
-                            children: [
-                              Text(
-                                'PRIVACY POLICY',
-                                style: theme.textTheme.labelMedium?.copyWith(
-                                  color: cs.onSurface.withOpacity(0.4),
-                                  letterSpacing: 1.0,
-                                ),
-                              ),
-                              Text(
-                                'TERMS OF SERVICE',
-                                style: theme.textTheme.labelMedium?.copyWith(
-                                  color: cs.onSurface.withOpacity(0.4),
-                                  letterSpacing: 1.0,
-                                ),
-                              ),
-                              Text(
-                                'SECURITY PROTOCOL',
-                                style: theme.textTheme.labelMedium?.copyWith(
-                                  color: cs.onSurface.withOpacity(0.4),
-                                  letterSpacing: 1.0,
-                                ),
-                              ),
-                            ],
-                          ),
                         ],
                       ),
-                      const SizedBox(height: 24),
                     ],
                   ),
                 ),

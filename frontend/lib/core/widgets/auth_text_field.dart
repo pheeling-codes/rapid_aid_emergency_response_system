@@ -11,6 +11,8 @@ class AuthTextField extends StatefulWidget {
   final Widget? suffixIcon;
   final TextInputType keyboardType;
   final String? Function(String?)? validator;
+  final bool forceLowercase;
+  final Function(bool)? onErrorStateChanged;
 
   const AuthTextField({
     Key? key,
@@ -21,6 +23,8 @@ class AuthTextField extends StatefulWidget {
     this.suffixIcon,
     this.keyboardType = TextInputType.text,
     this.validator,
+    this.forceLowercase = false,
+    this.onErrorStateChanged,
   }) : super(key: key);
 
   @override
@@ -30,6 +34,7 @@ class AuthTextField extends StatefulWidget {
 class _AuthTextFieldState extends State<AuthTextField> {
   final FocusNode _focusNode = FocusNode();
   bool _isFocused = false;
+  bool _hasLowercaseError = false;
 
   @override
   void initState() {
@@ -37,10 +42,28 @@ class _AuthTextFieldState extends State<AuthTextField> {
     _focusNode.addListener(() {
       setState(() => _isFocused = _focusNode.hasFocus);
     });
+    
+    if (widget.forceLowercase && widget.controller != null) {
+      widget.controller!.addListener(_validateLowercase);
+    }
+  }
+
+  void _validateLowercase() {
+    final text = widget.controller!.text;
+    final hasError = text.isNotEmpty && text != text.toLowerCase();
+    if (_hasLowercaseError != hasError) {
+      setState(() => _hasLowercaseError = hasError);
+      if (widget.onErrorStateChanged != null) {
+        widget.onErrorStateChanged!(hasError);
+      }
+    }
   }
 
   @override
   void dispose() {
+    if (widget.forceLowercase && widget.controller != null) {
+      widget.controller!.removeListener(_validateLowercase);
+    }
     _focusNode.dispose();
     super.dispose();
   }
@@ -68,7 +91,9 @@ class _AuthTextFieldState extends State<AuthTextField> {
             borderRadius: BorderRadius.circular(12),
             border: Border(
               bottom: BorderSide(
-                color: _isFocused ? cs.primary : Colors.transparent,
+                color: _hasLowercaseError 
+                    ? const Color(0xFFD32F2F) // Emergency Red
+                    : (_isFocused ? cs.primary : Colors.transparent),
                 width: 2.5,
               ),
             ),

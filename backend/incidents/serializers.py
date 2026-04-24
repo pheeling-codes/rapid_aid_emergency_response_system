@@ -76,8 +76,14 @@ class NearestRespondersSerializer(serializers.Serializer):
     last_name = serializers.CharField()
     phone_number = serializers.CharField()
     distance_km = serializers.SerializerMethodField()
+    location = serializers.SerializerMethodField()
 
     def get_distance_km(self, obj):
         if hasattr(obj, 'distance') and obj.distance:
             return round(obj.distance.km, 2)
+        return None
+
+    def get_location(self, obj):
+        if hasattr(obj, 'location') and obj.location:
+            return {"lat": round(obj.location.y, 6), "lng": round(obj.location.x, 6)}
         return None

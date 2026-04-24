@@ -9,6 +9,7 @@ import '../logic/auth_state.dart';
 import '../../../core/widgets/auth_text_field.dart';
 import '../../../core/widgets/action_button.dart';
 import '../../../core/widgets/role_segmented_control.dart';
+import '../../../core/widgets/rapid_aid_logo.dart';
 
 /// Universal Signup screen matching universal_signup.png.
 /// - Logo + "Create your account"
@@ -89,12 +90,28 @@ class _SignupScreenState extends State<SignupScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: Column(
                     children: [
-                      const SizedBox(height: 16),
+                      // Brand
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const RapidAidLogo(),
+                          const SizedBox(width: 10),
+                          Text(
+                            'Rapid Aid',
+                            style: theme.textTheme.headlineLarge?.copyWith(
+                              color: cs.primary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 30),
+
                       // Main card
                       Container(
                         width: double.infinity,
                         constraints: const BoxConstraints(maxWidth: 440),
-                        padding: const EdgeInsets.all(32),
+                        padding: const EdgeInsets.all(28),
                         decoration: BoxDecoration(
                           color: cs.surfaceContainerLowest,
                           borderRadius: BorderRadius.circular(16),
@@ -102,39 +119,30 @@ class _SignupScreenState extends State<SignupScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            // Brand
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  '✳',
-                                  style: TextStyle(
-                                    fontSize: 28,
-                                    color: cs.primary,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Rapid Aid',
-                                  style: theme.textTheme.titleLarge?.copyWith(
-                                    color: cs.primary,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 20),
                             Text(
-                              'Create your account',
-                              style: theme.textTheme.headlineMedium,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Join the clinical vanguard of emergency response.',
-                              textAlign: TextAlign.center,
-                              style: theme.textTheme.bodyLarge?.copyWith(
+                              'SIGNUP',
+                              style: theme.textTheme.headlineMedium?.copyWith(
                                 color: cs.onSurface.withOpacity(0.55),
                               ),
+                            ),
+                            const SizedBox(height: 28),
+
+                            // Role
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                'ROLE-BASED-ACCESS',
+                                style: theme.textTheme.labelMedium?.copyWith(
+                                  letterSpacing: 1.0,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            RoleSegmentedControl(
+                              selectedRole: _selectedRole,
+                              onRoleChanged: (role) {
+                                setState(() => _selectedRole = role);
+                              },
                             ),
                             const SizedBox(height: 28),
 
@@ -152,6 +160,7 @@ class _SignupScreenState extends State<SignupScreen> {
                               hintText: 'responder@rapidaid.org',
                               controller: _emailController,
                               keyboardType: TextInputType.emailAddress,
+                              forceLowercase: true,
                             ),
                             const SizedBox(height: 20),
 
@@ -178,36 +187,31 @@ class _SignupScreenState extends State<SignupScreen> {
                             ),
                             const SizedBox(height: 24),
 
-                            // Organization Role
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: Text(
-                                'ORGANIZATION ROLE',
-                                style: theme.textTheme.labelMedium?.copyWith(
-                                  letterSpacing: 1.0,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            RoleSegmentedControl(
-                              selectedRole: _selectedRole,
-                              onRoleChanged: (role) {
-                                setState(() => _selectedRole = role);
-                              },
-                            ),
-                            const SizedBox(height: 28),
-
                             // Create Account
                             ActionButton(
                               label: 'Create Account',
-                              icon: Icons.radio_button_unchecked,
                               isEmergency: true,
                               isLoading: isLoading,
                               onPressed: () {
+                                final email = _emailController.text.trim();
+                                if (email.isNotEmpty && email != email.toLowerCase()) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: const Text('Email must be in strictly lowercase letters.'),
+                                      backgroundColor: cs.error,
+                                      behavior: SnackBarBehavior.floating,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                  );
+                                  return;
+                                }
+
                                 context.read<AuthBloc>().add(
                                       AuthSignupRequested(
                                         fullName: _nameController.text.trim(),
-                                        email: _emailController.text.trim(),
+                                        email: email,
                                         password: _passwordController.text,
                                         role: _selectedRole,
                                       ),
@@ -243,37 +247,25 @@ class _SignupScreenState extends State<SignupScreen> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 40),
+
+                      const SizedBox(height: 48),
 
                       // Footer
-                      Wrap(
-                        alignment: WrapAlignment.spaceBetween,
-                        spacing: 24,
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(
-                            'PRIVACY POLICY',
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              color: cs.onSurface.withOpacity(0.4),
-                              letterSpacing: 1.0,
-                            ),
-                          ),
-                          Text(
-                            'TERMS OF SERVICE',
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              color: cs.onSurface.withOpacity(0.4),
-                              letterSpacing: 1.0,
-                            ),
-                          ),
-                          Text(
-                            'SECURITY PROTOCOL',
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              color: cs.onSurface.withOpacity(0.4),
-                              letterSpacing: 1.0,
+                          Center(
+                            child: Text(
+                              '© 2026 RAPID AID.   AI AIDED EMERGENCY RESPONSE SYSTEM',
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                color: cs.onSurface.withOpacity(0.35),
+                                letterSpacing: 0.8,
+                                fontSize: 12,
+                              ),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 24),
                     ],
                   ),
                 ),
