@@ -16,6 +16,14 @@ import '../../features/auth/presentation/role_splash_screen.dart';
 import '../../features/auth/presentation/verification_screen.dart';
 import '../../features/auth/presentation/reset_password_screen.dart';
 import '../../features/auth/presentation/security_updated_splash.dart';
+import '../../features/citizen/presentation/citizen_shell.dart';
+import '../../features/citizen/presentation/citizen_dashboard_screen.dart';
+import '../../features/citizen/presentation/citizen_active_incident_screen.dart';
+import '../../features/citizen/presentation/citizen_profile_screen.dart';
+import '../../features/citizen/presentation/citizen_reports_screen.dart';
+import '../../features/citizen/presentation/citizen_incident_details_screen.dart';
+import '../../features/citizen/presentation/citizen_dispatch_confirm_screen.dart';
+import '../../features/citizen/presentation/citizen_report_details_screen.dart';
 
 /// GoRouter configuration with RBAC navigation guards.
 ///
@@ -115,14 +123,60 @@ class AppRouter {
         },
       ),
 
-      // ── Stage 4: Dashboard Shells (placeholder for now) ──
-      GoRoute(
-        path: '/citizen',
-        builder: (context, state) => _DashboardPlaceholder(
-          title: 'Citizen Dashboard',
-          role: UserRole.citizen,
-        ),
+      // ── Stage 4: Citizen Shell with Bottom Navigation ──
+      ShellRoute(
+        builder: (context, state, child) => CitizenShell(child: child),
+        routes: [
+          GoRoute(
+            path: '/citizen',
+            redirect: (context, state) => '/citizen/dashboard',
+          ),
+          GoRoute(
+            path: '/citizen/dashboard',
+            builder: (context, state) => const CitizenDashboardScreen(),
+          ),
+          GoRoute(
+            path: '/citizen/reports',
+            builder: (context, state) => const CitizenReportsScreen(),
+          ),
+          GoRoute(
+            path: '/citizen/active',
+            builder: (context, state) => const CitizenActiveIncidentScreen(),
+          ),
+          GoRoute(
+            path: '/citizen/profile',
+            builder: (context, state) => const CitizenProfileScreen(),
+          ),
+        ],
       ),
+
+      // ── Citizen Full-Screen Routes (outside shell) ──
+      GoRoute(
+        path: '/citizen/incident-details/:type',
+        builder: (context, state) {
+          final type = state.pathParameters['type'] ?? 'medical';
+          return CitizenIncidentDetailsScreen(incidentType: type);
+        },
+      ),
+      GoRoute(
+        path: '/citizen/dispatch-confirm',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, String>? ?? {};
+          return CitizenDispatchConfirmScreen(
+            incidentType: extra['type'] ?? 'Medical',
+            description: extra['description'] ?? '',
+          );
+        },
+      ),
+      GoRoute(
+        path: '/citizen/report-details',
+        builder: (context, state) {
+          final data = state.extra as Map<String, dynamic>? ?? {};
+          return CitizenReportDetailsScreen(data: data);
+        },
+      ),
+
+      // ── Stage 4b: Responder & Admin Placeholders ──
       GoRoute(
         path: '/responder',
         builder: (context, state) => _DashboardPlaceholder(
@@ -188,9 +242,18 @@ class AppRouter {
       final role = authState.selectedRole;
       final allowedRoute = role.dashboardRoute;
 
-      // Block cross-role access to dashboard routes
-      const dashboardPaths = ['/citizen', '/responder', '/admin'];
-      if (dashboardPaths.contains(location) && location != allowedRoute) {
+      final isCitizenRoute =
+          location.startsWith('/citizen/') || location == '/citizen';
+      final isResponderRoute = location.startsWith('/responder');
+      final isAdminRoute = location.startsWith('/admin');
+
+      if (isCitizenRoute && allowedRoute != '/citizen') {
+        return allowedRoute;
+      }
+      if (isResponderRoute && allowedRoute != '/responder') {
+        return allowedRoute;
+      }
+      if (isAdminRoute && allowedRoute != '/admin') {
         return allowedRoute;
       }
     }
