@@ -4,11 +4,16 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/theme.dart';
 import '../../../core/widgets/rapid_aid_button.dart';
+import '../../../core/widgets/auth_text_field.dart';
 import '../../auth/logic/auth_bloc.dart';
 import '../../auth/logic/auth_event.dart';
 
 /// CitizenProfileScreen - User profile and settings
-/// Migrated from profile_screen.dart with Clinical Vanguard design compliance
+/// Clinical Vanguard Design System Compliance:
+/// - AuthTextField for editorial input style with lowercase enforcement
+/// - No borders on avatar (No-Line Rule)
+/// - Tonal depth for section separation
+/// - Deep Slate (#111827) for headings
 class CitizenProfileScreen extends StatefulWidget {
   const CitizenProfileScreen({super.key});
 
@@ -20,10 +25,21 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
   bool _darkTheme = false;
   bool _locationServices = true;
 
+  final _nameController = TextEditingController(text: 'Alex Henderson');
+  final _phoneController = TextEditingController(text: '+1 (555) 123-4567');
+  final _emailController = TextEditingController(text: 'alex.h@rapidaid.org');
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _phoneController.dispose();
+    _emailController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final cs = theme.colorScheme;
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundBase,
@@ -37,19 +53,16 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   children: [
-                    // Avatar - Primary Blue accent
+                    // Avatar - Primary Blue accent, NO BORDER per No-Line Rule
                     Stack(
                       children: [
                         Container(
                           width: 90,
                           height: 90,
-                          decoration: BoxDecoration(
+                          decoration: const BoxDecoration(
                             shape: BoxShape.circle,
                             color: AppTheme.primary,
-                            border: Border.all(
-                              color: AppTheme.surfaceContainerLowest,
-                              width: 3,
-                            ),
+                            // Border removed per No-Line Rule
                           ),
                           child: const ClipOval(
                             child: Icon(
@@ -80,17 +93,27 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
                     ),
                     const SizedBox(height: 24),
 
-                    // Profile Fields - Using RapidAidInput style (no borders)
-                    _ProfileField(label: 'Full Name', value: 'Alex Henderson'),
-                    const SizedBox(height: 12),
-                    _ProfileField(
-                      label: 'Phone Number',
-                      value: '+1 (555) 123-4567',
+                    // Profile Fields - Using AuthTextField with editorial style
+                    // Email field enforces lowercase validation
+                    AuthTextField(
+                      label: 'FULL NAME',
+                      hintText: 'Enter your full name',
+                      controller: _nameController,
                     ),
-                    const SizedBox(height: 12),
-                    _ProfileField(
-                      label: 'Email Address',
-                      value: 'alex.h@rapidaid.org',
+                    const SizedBox(height: 16),
+                    AuthTextField(
+                      label: 'PHONE NUMBER',
+                      hintText: 'Enter your phone number',
+                      controller: _phoneController,
+                      keyboardType: TextInputType.phone,
+                    ),
+                    const SizedBox(height: 16),
+                    AuthTextField(
+                      label: 'EMAIL ADDRESS',
+                      hintText: 'Enter your email',
+                      controller: _emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      forceLowercase: true,
                     ),
                   ],
                 ),
@@ -162,7 +185,7 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
                     Text(
                       'Top 5% of active community responders',
                       style: theme.textTheme.bodyLarge?.copyWith(
-                        color: cs.onSurface.withOpacity(0.6),
+                        color: AppTheme.bodyColor.withOpacity(0.6),
                         fontSize: 13,
                       ),
                     ),
@@ -291,7 +314,7 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
         content: Text(
           'This will permanently delete all your report data. This action cannot be undone.',
           style: theme.textTheme.bodyLarge?.copyWith(
-            color: theme.colorScheme.onSurface.withOpacity(0.6),
+            color: AppTheme.bodyColor.withOpacity(0.6),
           ),
         ),
         actions: [
@@ -300,7 +323,7 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
             child: Text(
               'Cancel',
               style: theme.textTheme.labelMedium?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacity(0.6),
+                color: AppTheme.bodyColor.withOpacity(0.6),
               ),
             ),
           ),
@@ -331,12 +354,13 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
           'Sign Out',
           style: theme.textTheme.titleLarge?.copyWith(
             fontWeight: FontWeight.w700,
+            color: AppTheme.headingColor,
           ),
         ),
         content: Text(
           'Are you sure you want to sign out?',
           style: theme.textTheme.bodyLarge?.copyWith(
-            color: theme.colorScheme.onSurface.withOpacity(0.6),
+            color: AppTheme.bodyColor.withOpacity(0.6),
           ),
         ),
         actions: [
@@ -345,7 +369,7 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
             child: Text(
               'Cancel',
               style: theme.textTheme.labelMedium?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacity(0.6),
+                color: AppTheme.bodyColor.withOpacity(0.6),
               ),
             ),
           ),
@@ -372,46 +396,7 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
   }
 }
 
-class _ProfileField extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _ProfileField({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      decoration: BoxDecoration(
-        color: AppTheme.backgroundBase,
-        borderRadius: BorderRadius.circular(10),
-        // No border per No-Line Rule
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: AppTheme.primary,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: theme.textTheme.bodyLarge?.copyWith(
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+// _ProfileField removed - using AuthTextField instead for consistency
 
 class _SettingsToggle extends StatelessWidget {
   final IconData icon;
@@ -460,7 +445,7 @@ class _SettingsToggle extends StatelessWidget {
                   subtitle,
                   style: theme.textTheme.bodyLarge?.copyWith(
                     fontSize: 12,
-                    color: theme.colorScheme.onSurface.withOpacity(0.6),
+                    color: AppTheme.bodyColor.withOpacity(0.6),
                   ),
                 ),
               ],

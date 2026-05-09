@@ -17,3 +17,6 @@ export 'presentation/citizen_reports_screen.dart';
 export 'presentation/citizen_incident_details_screen.dart';
 export 'presentation/citizen_dispatch_confirm_screen.dart';
 export 'presentation/citizen_report_details_screen.dart';
+
+// Services Layer
+export 'services/location_service.dart';

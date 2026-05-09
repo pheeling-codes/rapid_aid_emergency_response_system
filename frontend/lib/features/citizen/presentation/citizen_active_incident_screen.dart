@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
+import 'dart:ui';
 
 import '../../../core/theme/theme.dart';
-import '../../../core/widgets/rapid_aid_button.dart';
+import '../../../core/widgets/action_button.dart';
 
 /// CitizenActiveIncidentScreen - Live activity tracking for active incidents
-/// Migrated from active_incident_screen.dart with Clinical Vanguard design compliance
+/// Clinical Vanguard Design System Compliance:
+/// - Frosted Glass (Backdrop Blur) overlay for live map activity
+/// - Timeline with tonal depth cards (no borders)
+/// - 56px height emergency button
+/// - Editorial typography throughout
 class CitizenActiveIncidentScreen extends StatelessWidget {
   const CitizenActiveIncidentScreen({super.key});
 
@@ -16,12 +21,13 @@ class CitizenActiveIncidentScreen extends StatelessWidget {
       backgroundColor: AppTheme.backgroundBase,
       body: Column(
         children: [
-          // Map - Using tonal depth instead of solid colors
+          // Map with Frosted Glass overlay
           SizedBox(
-            height: 260,
+            height: 280,
             width: double.infinity,
             child: Stack(
               children: [
+                // Base map grid
                 Container(
                   color: AppTheme.surfaceContainerLow,
                   child: CustomPaint(
@@ -29,7 +35,31 @@ class CitizenActiveIncidentScreen extends StatelessWidget {
                     child: Container(),
                   ),
                 ),
-                // Responder en route banner - Emergency Red accent
+                // Frosted Glass overlay at bottom for text legibility
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  height: 80,
+                  child: ClipRRect(
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              AppTheme.surfaceContainerLow.withOpacity(0.0),
+                              AppTheme.surfaceContainerLow.withOpacity(0.8),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                // Responder en route banner - Emergency Red accent with tonal depth
                 Positioned(
                   top: MediaQuery.of(context).padding.top + 16,
                   right: 0,
@@ -38,12 +68,20 @@ class CitizenActiveIncidentScreen extends StatelessWidget {
                       horizontal: 16,
                       vertical: 8,
                     ),
-                    decoration: const BoxDecoration(
+                    decoration: BoxDecoration(
                       color: AppTheme.emergencyUrl,
-                      borderRadius: BorderRadius.only(
+                      borderRadius: const BorderRadius.only(
                         topLeft: Radius.circular(20),
                         bottomLeft: Radius.circular(20),
                       ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.emergencyUrl.withOpacity(0.3),
+                          offset: const Offset(0, 4),
+                          blurRadius: 12,
+                          spreadRadius: -2,
+                        ),
+                      ],
                     ),
                     child: Row(
                       children: [
@@ -58,33 +96,38 @@ class CitizenActiveIncidentScreen extends StatelessWidget {
                           style: theme.textTheme.labelMedium?.copyWith(
                             color: Colors.white,
                             fontWeight: FontWeight.w700,
+                            letterSpacing: 0.8,
                           ),
                         ),
                       ],
                     ),
                   ),
                 ),
-                // Incident pin - Emergency Red with tonal depth
+                // Incident pin - Emergency Red with tonal ring (not border)
                 Positioned(
                   top: 80,
                   right: 140,
                   child: Column(
                     children: [
                       Container(
-                        width: 44,
-                        height: 44,
+                        width: 48,
+                        height: 48,
                         decoration: BoxDecoration(
                           color: AppTheme.emergencyUrl,
                           shape: BoxShape.circle,
-                          border: Border.all(
-                            color: AppTheme.surfaceContainerLowest,
-                            width: 3,
-                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppTheme.emergencyUrl.withOpacity(0.4),
+                              offset: const Offset(0, 4),
+                              blurRadius: 12,
+                              spreadRadius: 0,
+                            ),
+                          ],
                         ),
                         child: const Icon(
                           Icons.emergency,
                           color: Colors.white,
-                          size: 22,
+                          size: 24,
                         ),
                       ),
                       Container(
@@ -95,22 +138,11 @@ class CitizenActiveIncidentScreen extends StatelessWidget {
                     ],
                   ),
                 ),
-                // User dot - Primary Blue
+                // User dot - Primary Blue with pulsing effect
                 Positioned(
                   top: 140,
                   left: 100,
-                  child: CircleAvatar(
-                    radius: 8,
-                    backgroundColor: AppTheme.primary,
-                    child: Container(
-                      width: 4,
-                      height: 4,
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ),
+                  child: _PulsingUserDot(),
                 ),
               ],
             ),
@@ -122,7 +154,7 @@ class CitizenActiveIncidentScreen extends StatelessWidget {
               color: AppTheme.surfaceContainerLowest,
               child: Column(
                 children: [
-                  // Header
+                  // Header with editorial typography
                   Padding(
                     padding: const EdgeInsets.all(16),
                     child: Row(
@@ -132,12 +164,13 @@ class CitizenActiveIncidentScreen extends StatelessWidget {
                           'Live Activity',
                           style: theme.textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.w800,
+                            color: AppTheme.headingColor,
                           ),
                         ),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 5,
+                            horizontal: 12,
+                            vertical: 6,
                           ),
                           decoration: BoxDecoration(
                             color: AppTheme.emergencyUrl.withOpacity(0.12),
@@ -148,6 +181,8 @@ class CitizenActiveIncidentScreen extends StatelessWidget {
                             style: theme.textTheme.labelMedium?.copyWith(
                               color: AppTheme.emergencyUrl,
                               fontWeight: FontWeight.w700,
+                              letterSpacing: 0.8,
+                              fontSize: 11,
                             ),
                           ),
                         ),
@@ -187,15 +222,16 @@ class CitizenActiveIncidentScreen extends StatelessWidget {
                     ),
                   ),
 
-                  // Call Responder button - Using RapidAidButton
+                  // Call Responder button - 56px height ActionButton
                   Padding(
                     padding: const EdgeInsets.all(16),
-                    child: RapidAidButton(
+                    child: ActionButton(
                       label: 'CALL RESPONDER',
                       onPressed: () {
                         // TODO: Implement call functionality
                       },
-                      isPrimary: true,
+                      isEmergency: true,
+                      icon: Icons.phone,
                     ),
                   ),
                 ],
@@ -204,6 +240,78 @@ class CitizenActiveIncidentScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Pulsing User Dot - Animated indicator for live tracking
+class _PulsingUserDot extends StatefulWidget {
+  @override
+  State<_PulsingUserDot> createState() => _PulsingUserDotState();
+}
+
+class _PulsingUserDotState extends State<_PulsingUserDot>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _pulseAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    )..repeat();
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.5).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _pulseAnimation,
+      builder: (context, child) {
+        return Stack(
+          alignment: Alignment.center,
+          children: [
+            // Pulsing ring
+            Container(
+              width: 24 * _pulseAnimation.value,
+              height: 24 * _pulseAnimation.value,
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withOpacity(0.2),
+                shape: BoxShape.circle,
+              ),
+            ),
+            // Core dot
+            Container(
+              width: 16,
+              height: 16,
+              decoration: const BoxDecoration(
+                color: AppTheme.primary,
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: Container(
+                  width: 6,
+                  height: 6,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

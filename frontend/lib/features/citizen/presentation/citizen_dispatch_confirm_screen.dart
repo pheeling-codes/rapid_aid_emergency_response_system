@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/theme.dart';
-import '../../../core/widgets/rapid_aid_button.dart';
+import '../../../core/widgets/action_button.dart';
 
 /// CitizenDispatchConfirmScreen - Incident confirmation and dispatch
 /// Migrated from dispatch_confirm_screen.dart with Clinical Vanguard design compliance
@@ -32,7 +32,6 @@ class CitizenDispatchConfirmScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final cs = theme.colorScheme;
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundBase,
@@ -173,20 +172,24 @@ class CitizenDispatchConfirmScreen extends StatelessWidget {
                                   Text(
                                     'Incident:',
                                     style: theme.textTheme.bodyLarge?.copyWith(
-                                      color: cs.onSurface.withOpacity(0.6),
+                                      color:
+                                          AppTheme.bodyColor.withOpacity(0.6),
                                     ),
                                   ),
                                   Text(
                                     incidentType,
-                                    style: theme.textTheme.headlineMedium?.copyWith(
+                                    style: theme.textTheme.headlineMedium
+                                        ?.copyWith(
                                       fontSize: 22,
                                       fontWeight: FontWeight.w800,
                                     ),
                                   ),
                                   Text(
                                     'REF ID: RA-992-01',
-                                    style: theme.textTheme.labelMedium?.copyWith(
-                                      color: cs.onSurface.withOpacity(0.6),
+                                    style:
+                                        theme.textTheme.labelMedium?.copyWith(
+                                      color:
+                                          AppTheme.bodyColor.withOpacity(0.6),
                                     ),
                                   ),
                                 ],
@@ -235,8 +238,10 @@ class CitizenDispatchConfirmScreen extends StatelessWidget {
                                 children: [
                                   Text(
                                     'LOCATION',
-                                    style: theme.textTheme.labelMedium?.copyWith(
-                                      color: cs.onSurface.withOpacity(0.5),
+                                    style:
+                                        theme.textTheme.labelMedium?.copyWith(
+                                      color:
+                                          AppTheme.bodyColor.withOpacity(0.5),
                                       fontWeight: FontWeight.w700,
                                       letterSpacing: 0.8,
                                     ),
@@ -251,7 +256,8 @@ class CitizenDispatchConfirmScreen extends StatelessWidget {
                                   Text(
                                     'Lagos, Nigeria • Outer Lane (Southbound)',
                                     style: theme.textTheme.bodyLarge?.copyWith(
-                                      color: cs.onSurface.withOpacity(0.6),
+                                      color:
+                                          AppTheme.bodyColor.withOpacity(0.6),
                                     ),
                                   ),
                                 ],
@@ -277,8 +283,10 @@ class CitizenDispatchConfirmScreen extends StatelessWidget {
                                 children: [
                                   Text(
                                     'DESCRIPTION',
-                                    style: theme.textTheme.labelMedium?.copyWith(
-                                      color: cs.onSurface.withOpacity(0.5),
+                                    style:
+                                        theme.textTheme.labelMedium?.copyWith(
+                                      color:
+                                          AppTheme.bodyColor.withOpacity(0.5),
                                       fontWeight: FontWeight.w700,
                                       letterSpacing: 0.8,
                                     ),
@@ -287,7 +295,8 @@ class CitizenDispatchConfirmScreen extends StatelessWidget {
                                   Text(
                                     '"${description.isNotEmpty ? description : 'Two-car collision with visible injuries. Requesting immediate ambulance support.'}"',
                                     style: theme.textTheme.bodyLarge?.copyWith(
-                                      color: cs.onSurface.withOpacity(0.6),
+                                      color:
+                                          AppTheme.bodyColor.withOpacity(0.6),
                                       fontStyle: FontStyle.italic,
                                       height: 1.5,
                                     ),
@@ -322,7 +331,7 @@ class CitizenDispatchConfirmScreen extends StatelessWidget {
                                 Text(
                                   'Responder pre-allocated',
                                   style: theme.textTheme.bodyLarge?.copyWith(
-                                    color: cs.onSurface.withOpacity(0.6),
+                                    color: AppTheme.bodyColor.withOpacity(0.6),
                                   ),
                                 ),
                               ],
@@ -340,15 +349,16 @@ class CitizenDispatchConfirmScreen extends StatelessWidget {
                     ),
                   ),
 
-                  // Confirm & Dispatch - Using RapidAidButton
+                  // Confirm & Dispatch - 56px height ActionButton
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: RapidAidButton(
+                    child: ActionButton(
                       label: 'CONFIRM & DISPATCH',
                       onPressed: () {
                         context.go('/citizen/active');
                       },
-                      isPrimary: true,
+                      isEmergency: true,
+                      icon: Icons.emergency,
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -376,7 +386,7 @@ class CitizenDispatchConfirmScreen extends StatelessWidget {
                               'Safety Disclaimer: False reports are subject to legal penalties under the Emergency Services Act. Help is being pre-allocated to your verified location.',
                               style: theme.textTheme.bodyLarge?.copyWith(
                                 fontSize: 12,
-                                color: cs.onSurface.withOpacity(0.6),
+                                color: AppTheme.bodyColor.withOpacity(0.6),
                                 height: 1.4,
                               ),
                             ),

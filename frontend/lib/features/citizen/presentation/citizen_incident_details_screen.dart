@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/theme.dart';
-import '../../../core/widgets/rapid_aid_button.dart';
+import '../../../core/widgets/action_button.dart';
 
 /// CitizenIncidentDetailsScreen - Incident details form with description and evidence
 /// Migrated from incident_details_screen.dart with Clinical Vanguard design compliance
@@ -53,7 +53,6 @@ class _CitizenIncidentDetailsScreenState
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final cs = theme.colorScheme;
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundBase,
@@ -87,7 +86,7 @@ class _CitizenIncidentDetailsScreenState
             Text(
               'Provide a brief description or upload a photo to help responders prepare.',
               style: theme.textTheme.bodyLarge?.copyWith(
-                color: cs.onSurface.withOpacity(0.6),
+                color: AppTheme.bodyColor.withOpacity(0.6),
                 height: 1.5,
               ),
             ),
@@ -118,7 +117,7 @@ class _CitizenIncidentDetailsScreenState
                     decoration: InputDecoration(
                       hintText: _placeholder,
                       hintStyle: theme.textTheme.bodyLarge?.copyWith(
-                        color: cs.onSurface.withOpacity(0.4),
+                        color: AppTheme.bodyColor.withOpacity(0.4),
                       ),
                       border: InputBorder.none,
                       contentPadding: const EdgeInsets.all(16),
@@ -133,7 +132,7 @@ class _CitizenIncidentDetailsScreenState
                       child: Text(
                         '${_descriptionController.text.length} / 500',
                         style: theme.textTheme.labelMedium?.copyWith(
-                          color: cs.onSurface.withOpacity(0.4),
+                          color: AppTheme.bodyColor.withOpacity(0.4),
                         ),
                       ),
                     ),
@@ -180,7 +179,7 @@ class _CitizenIncidentDetailsScreenState
                             : Icons.add_a_photo_outlined,
                         color: _hasPhoto
                             ? AppTheme.primary
-                            : cs.onSurface.withOpacity(0.6),
+                            : AppTheme.bodyColor.withOpacity(0.6),
                         size: 26,
                       ),
                     ),
@@ -198,7 +197,7 @@ class _CitizenIncidentDetailsScreenState
                     Text(
                       'Capture or select from gallery',
                       style: theme.textTheme.bodyLarge?.copyWith(
-                        color: cs.onSurface.withOpacity(0.5),
+                        color: AppTheme.bodyColor.withOpacity(0.5),
                         fontSize: 13,
                       ),
                     ),
@@ -239,8 +238,8 @@ class _CitizenIncidentDetailsScreenState
             ),
             const SizedBox(height: 20),
 
-            // Review Emergency button - Using RapidAidButton with Emergency Red
-            RapidAidButton(
+            // Review Emergency button - 56px height ActionButton
+            ActionButton(
               label: 'Review Emergency',
               onPressed: () {
                 context.push(
@@ -253,7 +252,8 @@ class _CitizenIncidentDetailsScreenState
                   },
                 );
               },
-              isPrimary: true,
+              isEmergency: true,
+              icon: Icons.arrow_forward,
             ),
           ],
         ),

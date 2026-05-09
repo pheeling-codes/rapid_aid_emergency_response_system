@@ -20,8 +20,8 @@ class CitizenShell extends StatefulWidget {
 class _CitizenShellState extends State<CitizenShell> {
   int _calculateSelectedIndex(String location) {
     if (location.startsWith('/citizen/dashboard')) return 0;
-    if (location.startsWith('/citizen/reports')) return 1;
-    if (location.startsWith('/citizen/active')) return 2;
+    if (location.startsWith('/citizen/active')) return 1;
+    if (location.startsWith('/citizen/reports')) return 2;
     if (location.startsWith('/citizen/profile')) return 3;
     return 0;
   }
@@ -32,10 +32,10 @@ class _CitizenShellState extends State<CitizenShell> {
         context.go('/citizen/dashboard');
         break;
       case 1:
-        context.go('/citizen/reports');
+        context.go('/citizen/active');
         break;
       case 2:
-        context.go('/citizen/active');
+        context.go('/citizen/reports');
         break;
       case 3:
         context.go('/citizen/profile');
@@ -58,6 +58,7 @@ class _CitizenShellState extends State<CitizenShell> {
         elevation: 0,
         indicatorColor: AppTheme.primary.withOpacity(0.1),
         destinations: [
+          // Home - Emergency Dashboard
           NavigationDestination(
             icon: Icon(
               Icons.home_outlined,
@@ -65,32 +66,51 @@ class _CitizenShellState extends State<CitizenShell> {
                   ? AppTheme.primary
                   : AppTheme.bodyColor.withOpacity(0.6),
             ),
+            selectedIcon: Icon(
+              Icons.home,
+              color: AppTheme.primary,
+            ),
             label: 'Home',
           ),
+          // Map - Active Incident / Live Tracking
           NavigationDestination(
             icon: Icon(
-              Icons.receipt_outlined,
+              Icons.map_outlined,
               color: selectedIndex == 1
                   ? AppTheme.primary
                   : AppTheme.bodyColor.withOpacity(0.6),
             ),
-            label: 'Reports',
+            selectedIcon: Icon(
+              Icons.map,
+              color: AppTheme.primary,
+            ),
+            label: 'Map',
           ),
+          // History - Report History
           NavigationDestination(
             icon: Icon(
-              Icons.emergency_outlined,
+              Icons.history,
               color: selectedIndex == 2
-                  ? AppTheme.emergencyUrl
+                  ? AppTheme.primary
                   : AppTheme.bodyColor.withOpacity(0.6),
             ),
-            label: 'Active',
+            selectedIcon: Icon(
+              Icons.history,
+              color: AppTheme.primary,
+            ),
+            label: 'History',
           ),
+          // Profile - User Settings
           NavigationDestination(
             icon: Icon(
               Icons.person_outlined,
               color: selectedIndex == 3
                   ? AppTheme.primary
                   : AppTheme.bodyColor.withOpacity(0.6),
+            ),
+            selectedIcon: Icon(
+              Icons.person,
+              color: AppTheme.primary,
             ),
             label: 'Profile',
           ),

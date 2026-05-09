@@ -15,7 +15,6 @@ class CitizenReportDetailsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final cs = theme.colorScheme;
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundBase,
@@ -91,13 +90,13 @@ class CitizenReportDetailsScreen extends StatelessWidget {
                     Icon(
                       Icons.map_outlined,
                       size: 48,
-                      color: cs.onSurface.withOpacity(0.3),
+                      color: AppTheme.bodyColor.withOpacity(0.3),
                     ),
                     const SizedBox(height: 12),
                     Text(
                       'Incident Location Map',
                       style: theme.textTheme.bodyLarge?.copyWith(
-                        color: cs.onSurface.withOpacity(0.5),
+                        color: AppTheme.bodyColor.withOpacity(0.5),
                       ),
                     ),
                   ],
@@ -141,7 +140,6 @@ class _DetailRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final cs = theme.colorScheme;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -167,7 +165,7 @@ class _DetailRow extends StatelessWidget {
               Text(
                 label,
                 style: theme.textTheme.labelMedium?.copyWith(
-                  color: cs.onSurface.withOpacity(0.5),
+                  color: AppTheme.bodyColor.withOpacity(0.5),
                   fontWeight: FontWeight.w600,
                 ),
               ),
