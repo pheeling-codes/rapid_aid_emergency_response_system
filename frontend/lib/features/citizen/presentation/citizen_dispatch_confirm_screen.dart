@@ -3,424 +3,321 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/theme.dart';
 import '../../../core/widgets/action_button.dart';
+import '../services/dispatch_service.dart';
+import '../services/location_service.dart';
 
-/// CitizenDispatchConfirmScreen - Incident confirmation and dispatch
-/// Migrated from dispatch_confirm_screen.dart with Clinical Vanguard design compliance
-class CitizenDispatchConfirmScreen extends StatelessWidget {
-  final String incidentType;
-  final String description;
+/// Citizen Dispatch Confirm Screen
+/// Step 3: Confirm & Dispatch
+/// High-precision summary screen with validated address, category, and description
+/// Primary action is a 56px 'Confirm & Dispatch' button in Emergency Red
+/// Wires to DispatchService for nearest-responder logic
+class CitizenDispatchConfirmScreen extends StatefulWidget {
+  const CitizenDispatchConfirmScreen({super.key});
 
-  const CitizenDispatchConfirmScreen({
-    super.key,
-    required this.incidentType,
-    required this.description,
-  });
+  @override
+  State<CitizenDispatchConfirmScreen> createState() =>
+      _CitizenDispatchConfirmScreenState();
+}
 
-  IconData get _incidentIcon {
-    switch (incidentType.toLowerCase()) {
-      case 'fire':
-        return Icons.local_fire_department;
-      case 'accident':
-        return Icons.car_crash;
-      case 'security':
-        return Icons.security;
-      default:
-        return Icons.medical_services;
+class _CitizenDispatchConfirmScreenState
+    extends State<CitizenDispatchConfirmScreen> {
+  final DispatchService _dispatchService = DispatchService();
+  final LocationService _locationService = LocationService();
+  bool _isDispatching = false;
+
+  Future<void> _handleDispatch() async {
+    final data = ModalRoute.of(context)?.settings.arguments as Map?;
+    final type = data?['type'] as String? ?? 'SOS';
+    final description = data?['description'] as String? ?? 'Emergency reported';
+    final hasPhoto = data?['hasPhoto'] as bool? ?? false;
+
+    setState(() => _isDispatching = true);
+
+    try {
+      // Get current location
+      final position = await _locationService.getCurrentPosition();
+
+      // Dispatch emergency
+      final result = await _dispatchService.dispatchEmergency(
+        type: type,
+        description: description,
+        location: position != null
+            ? {'latitude': position.latitude, 'longitude': position.longitude}
+            : {'latitude': 0.0, 'longitude': 0.0},
+        hasPhoto: hasPhoto,
+      );
+
+      if (mounted) {
+        if (result.success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result.message ?? 'Dispatch successful'),
+              backgroundColor: AppTheme.primary,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          );
+          context.go('/citizen/map');
+        } else {
+          setState(() => _isDispatching = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Dispatch failed. Please try again.'),
+              backgroundColor: AppTheme.emergencyUrl,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isDispatching = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: AppTheme.emergencyUrl,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final data = ModalRoute.of(context)?.settings.arguments as Map?;
+    final type = data?['type'] as String? ?? 'SOS';
+    final description = data?['description'] as String? ?? 'Emergency reported';
+    final hasPhoto = data?['hasPhoto'] as bool? ?? false;
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundBase,
       appBar: AppBar(
-        backgroundColor: AppTheme.surfaceContainerLowest,
+        backgroundColor: AppTheme.backgroundBase,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppTheme.headingColor),
-          onPressed: () => context.pop(),
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          'Confirm Dispatch',
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.w700,
+          'CONFIRM DISPATCH',
+          style: theme.textTheme.labelMedium?.copyWith(
+            letterSpacing: 1.0,
           ),
         ),
-        centerTitle: true,
       ),
-      body: Column(
-        children: [
-          // Map section - Using tonal depth
-          Container(
-            height: 200,
-            width: double.infinity,
-            color: AppTheme.surfaceContainerLow,
-            child: Stack(
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Map placeholder with grid
+                const SizedBox(height: 16),
+
+                // Warning Banner
                 Container(
-                  color: AppTheme.surfaceContainerLow,
-                  child: CustomPaint(
-                    painter: _MapGridPainter(),
-                    child: Container(),
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppTheme.emergencyUrl.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                ),
-                // GPS badge - No borders
-                Positioned(
-                  top: 16,
-                  left: 16,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppTheme.surfaceContainerLowest,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: const BoxDecoration(
-                            color: AppTheme.primary,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          'GPS FIX: HIGH ACCURACY',
-                          style: theme.textTheme.labelMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                // Location pin - Emergency Red
-                Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  child: Row(
                     children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: AppTheme.emergencyUrl.withOpacity(0.9),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.emergency,
-                          color: Colors.white,
-                          size: 26,
-                        ),
-                      ),
-                      Container(
-                        width: 2,
-                        height: 16,
+                      Icon(
+                        Icons.warning_amber_rounded,
                         color: AppTheme.emergencyUrl,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'This will dispatch emergency responders to your current location.',
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: AppTheme.emergencyUrl,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
                     ],
                   ),
                 ),
-              ],
-            ),
-          ),
+                const SizedBox(height: 24),
 
-          // Details card - Using surfaceContainerLowest
-          Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  Container(
-                    margin: const EdgeInsets.all(16),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppTheme.surfaceContainerLowest,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Incident type header
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                color: AppTheme.emergencyUrl.withOpacity(0.12),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Icon(
-                                _incidentIcon,
-                                color: AppTheme.emergencyUrl,
-                                size: 22,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Incident:',
-                                    style: theme.textTheme.bodyLarge?.copyWith(
-                                      color:
-                                          AppTheme.bodyColor.withOpacity(0.6),
-                                    ),
-                                  ),
-                                  Text(
-                                    incidentType,
-                                    style: theme.textTheme.headlineMedium
-                                        ?.copyWith(
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                  Text(
-                                    'REF ID: RA-992-01',
-                                    style:
-                                        theme.textTheme.labelMedium?.copyWith(
-                                      color:
-                                          AppTheme.bodyColor.withOpacity(0.6),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 5,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppTheme.emergencyUrl.withOpacity(0.12),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                'URGENT',
-                                style: theme.textTheme.labelMedium?.copyWith(
-                                  color: AppTheme.emergencyUrl,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        Divider(
-                          height: 1,
-                          color: AppTheme.surfaceContainerHigh,
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Location
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Icon(
-                              Icons.location_on,
-                              color: AppTheme.primary,
-                              size: 18,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'LOCATION',
-                                    style:
-                                        theme.textTheme.labelMedium?.copyWith(
-                                      color:
-                                          AppTheme.bodyColor.withOpacity(0.5),
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: 0.8,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '123 Third Mainland Bridge',
-                                    style: theme.textTheme.titleLarge?.copyWith(
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  Text(
-                                    'Lagos, Nigeria • Outer Lane (Southbound)',
-                                    style: theme.textTheme.bodyLarge?.copyWith(
-                                      color:
-                                          AppTheme.bodyColor.withOpacity(0.6),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Description
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Icon(
-                              Icons.description_outlined,
-                              color: AppTheme.primary,
-                              size: 18,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'DESCRIPTION',
-                                    style:
-                                        theme.textTheme.labelMedium?.copyWith(
-                                      color:
-                                          AppTheme.bodyColor.withOpacity(0.5),
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: 0.8,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '"${description.isNotEmpty ? description : 'Two-car collision with visible injuries. Requesting immediate ambulance support.'}"',
-                                    style: theme.textTheme.bodyLarge?.copyWith(
-                                      color:
-                                          AppTheme.bodyColor.withOpacity(0.6),
-                                      fontStyle: FontStyle.italic,
-                                      height: 1.5,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        Divider(
-                          height: 1,
-                          color: AppTheme.surfaceContainerHigh,
-                        ),
-                        const SizedBox(height: 12),
-
-                        // Responder info - Primary Blue for success states
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: const BoxDecoration(
-                                    color: AppTheme.primary,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Responder pre-allocated',
-                                  style: theme.textTheme.bodyLarge?.copyWith(
-                                    color: AppTheme.bodyColor.withOpacity(0.6),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            Text(
-                              'ETA: 6 MINS',
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                color: AppTheme.primary,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Confirm & Dispatch - 56px height ActionButton
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: ActionButton(
-                      label: 'CONFIRM & DISPATCH',
-                      onPressed: () {
-                        context.go('/citizen/active');
-                      },
-                      isEmergency: true,
-                      icon: Icons.emergency,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Safety disclaimer - Using surfaceContainerLow
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppTheme.surfaceContainerLow,
-                        borderRadius: BorderRadius.circular(10),
+                // Incident Summary Card
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surfaceContainerLowest,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.06),
+                        offset: const Offset(0, 12),
+                        blurRadius: 24,
+                        spreadRadius: -4,
                       ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Type
+                      Text(
+                        'EMERGENCY TYPE',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: AppTheme.bodyColor.withOpacity(0.5),
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        type.toUpperCase(),
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          color: AppTheme.headingColor,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Description
+                      Text(
+                        'DESCRIPTION',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: AppTheme.bodyColor.withOpacity(0.5),
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        description,
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: AppTheme.bodyColor,
+                          height: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Location
+                      Text(
+                        'LOCATION',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: AppTheme.bodyColor.withOpacity(0.5),
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
                         children: [
                           Icon(
-                            Icons.warning_amber_rounded,
-                            color: AppTheme.emergencyUrl,
-                            size: 18,
+                            Icons.location_on,
+                            color: AppTheme.primary,
+                            size: 20,
                           ),
                           const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Safety Disclaimer: False reports are subject to legal penalties under the Emergency Services Act. Help is being pre-allocated to your verified location.',
-                              style: theme.textTheme.bodyLarge?.copyWith(
-                                fontSize: 12,
-                                color: AppTheme.bodyColor.withOpacity(0.6),
-                                height: 1.4,
-                              ),
+                          Text(
+                            'Current GPS Location',
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              color: AppTheme.bodyColor,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ],
                       ),
-                    ),
+                      const SizedBox(height: 20),
+
+                      // Photo Status
+                      if (hasPhoto) ...[
+                        Text(
+                          'PHOTO EVIDENCE',
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: AppTheme.bodyColor.withOpacity(0.5),
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.check_circle,
+                              color: AppTheme.primary,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Photo attached',
+                              style: theme.textTheme.bodyLarge?.copyWith(
+                                color: AppTheme.bodyColor,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                      ],
+                    ],
                   ),
-                  const SizedBox(height: 24),
-                ],
-              ),
+                ),
+                const SizedBox(height: 32),
+
+                // Safety Disclaimer
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        color: AppTheme.bodyColor.withOpacity(0.6),
+                        size: 20,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'False reports are subject to legal penalties. Help will be dispatched to your verified location.',
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: AppTheme.bodyColor.withOpacity(0.6),
+                            fontSize: 13,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 32),
+
+                // Confirm & Dispatch Button - 56px height
+                ActionButton(
+                  label:
+                      _isDispatching ? 'DISPATCHING...' : 'CONFIRM & DISPATCH',
+                  isEmergency: true,
+                  icon: Icons.emergency,
+                  isLoading: _isDispatching,
+                  onPressed: _isDispatching ? null : _handleDispatch,
+                ),
+                const SizedBox(height: 48),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
-}
-
-class _MapGridPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = AppTheme.primary.withOpacity(0.1)
-      ..strokeWidth = 1;
-
-    for (double x = 0; x < size.width; x += 40) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
-    }
-    for (double y = 0; y < size.height; y += 40) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

@@ -17,13 +17,13 @@ import '../../features/auth/presentation/verification_screen.dart';
 import '../../features/auth/presentation/reset_password_screen.dart';
 import '../../features/auth/presentation/security_updated_splash.dart';
 import '../../features/citizen/presentation/citizen_shell.dart';
+import '../../features/citizen/presentation/citizen_splash_screen.dart';
 import '../../features/citizen/presentation/citizen_dashboard_screen.dart';
-import '../../features/citizen/presentation/citizen_active_incident_screen.dart';
-import '../../features/citizen/presentation/citizen_profile_screen.dart';
-import '../../features/citizen/presentation/citizen_reports_screen.dart';
 import '../../features/citizen/presentation/citizen_incident_details_screen.dart';
 import '../../features/citizen/presentation/citizen_dispatch_confirm_screen.dart';
-import '../../features/citizen/presentation/citizen_report_details_screen.dart';
+import '../../features/citizen/presentation/citizen_map_screen.dart';
+import '../../features/citizen/presentation/citizen_history_screen.dart';
+import '../../features/citizen/presentation/citizen_profile_screen.dart';
 
 /// GoRouter configuration with RBAC navigation guards.
 ///
@@ -133,46 +133,40 @@ class AppRouter {
           ),
           GoRoute(
             path: '/citizen/dashboard',
-            builder: (context, state) => const CitizenDashboardScreen(),
+            builder: (context, state) => CitizenDashboardScreen(),
           ),
           GoRoute(
-            path: '/citizen/reports',
-            builder: (context, state) => const CitizenReportsScreen(),
+            path: '/citizen/map',
+            builder: (context, state) => CitizenMapScreen(),
           ),
           GoRoute(
-            path: '/citizen/active',
-            builder: (context, state) => const CitizenActiveIncidentScreen(),
+            path: '/citizen/history',
+            builder: (context, state) => CitizenHistoryScreen(),
           ),
           GoRoute(
             path: '/citizen/profile',
-            builder: (context, state) => const CitizenProfileScreen(),
+            builder: (context, state) => CitizenProfileScreen(),
           ),
         ],
       ),
 
+      // ── Citizen Splash Screen ──
+      GoRoute(
+        path: '/citizen/splash',
+        builder: (context, state) => CitizenSplashScreen(),
+      ),
+
       // ── Citizen Full-Screen Routes (outside shell) ──
       GoRoute(
-        path: '/citizen/incident-details/:type',
+        path: '/citizen/incident-details',
         builder: (context, state) {
-          final type = state.pathParameters['type'] ?? 'medical';
-          return CitizenIncidentDetailsScreen(incidentType: type);
+          return CitizenIncidentDetailsScreen();
         },
       ),
       GoRoute(
         path: '/citizen/dispatch-confirm',
         builder: (context, state) {
-          final extra = state.extra as Map<String, String>? ?? {};
-          return CitizenDispatchConfirmScreen(
-            incidentType: extra['type'] ?? 'Medical',
-            description: extra['description'] ?? '',
-          );
-        },
-      ),
-      GoRoute(
-        path: '/citizen/report-details',
-        builder: (context, state) {
-          final data = state.extra as Map<String, dynamic>? ?? {};
-          return CitizenReportDetailsScreen(data: data);
+          return CitizenDispatchConfirmScreen();
         },
       ),
 
