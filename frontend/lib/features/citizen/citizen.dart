@@ -14,9 +14,9 @@
 // Presentation Layer
 export 'presentation/citizen_splash_screen.dart';
 export 'presentation/citizen_shell.dart';
-export 'presentation/citizen_dashboard_screen.dart';
-export 'presentation/citizen_incident_details_screen.dart';
-export 'presentation/citizen_dispatch_confirm_screen.dart';
+export 'presentation/citizen_dashboard.dart';
+export 'presentation/input_emergency_details.dart';
+export 'presentation/confirm_dispatch.dart';
 export 'presentation/citizen_map_screen.dart';
 export 'presentation/citizen_history_screen.dart';
 export 'presentation/citizen_profile_screen.dart';

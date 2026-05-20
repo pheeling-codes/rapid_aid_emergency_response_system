@@ -3,12 +3,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/theme.dart';
 
-/// Citizen Shell
-/// Material 3 Bottom Navbar with exactly 4 destinations:
-/// - Home (Dashboard): The tactical trigger center
-/// - Map: The live tracking and regional safety view
-/// - History: A high-density list of past reports
-/// - Profile: A clean settings view
 class CitizenShell extends StatefulWidget {
   const CitizenShell({super.key, required this.child});
 
@@ -21,83 +15,103 @@ class CitizenShell extends StatefulWidget {
 class _CitizenShellState extends State<CitizenShell> {
   int _selectedIndex = 0;
 
-  final List<NavigationDestination> _destinations = const [
-    NavigationDestination(
-      icon: Icon(Icons.home_outlined),
-      selectedIcon: Icon(Icons.home),
-      label: 'Home',
-    ),
-    NavigationDestination(
-      icon: Icon(Icons.map_outlined),
-      selectedIcon: Icon(Icons.map),
-      label: 'Map',
-    ),
-    NavigationDestination(
-      icon: Icon(Icons.history_outlined),
-      selectedIcon: Icon(Icons.history),
-      label: 'History',
-    ),
-    NavigationDestination(
-      icon: Icon(Icons.person_outline),
-      selectedIcon: Icon(Icons.person),
-      label: 'Profile',
-    ),
-  ];
-
   @override
   Widget build(BuildContext context) {
     final location = GoRouterState.of(context).uri.path;
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
 
-    // Update selected index based on current route
     if (location.startsWith('/citizen/dashboard')) {
       _selectedIndex = 0;
-    } else if (location.startsWith('/citizen/map')) {
-      _selectedIndex = 1;
     } else if (location.startsWith('/citizen/history')) {
+      _selectedIndex = 1;
+    } else if (location.startsWith('/citizen/map')) {
       _selectedIndex = 2;
     } else if (location.startsWith('/citizen/profile')) {
       _selectedIndex = 3;
     }
 
     return Scaffold(
-      backgroundColor: AppTheme.backgroundBase,
+      backgroundColor: cs.surfaceContainerLowest,
       body: widget.child,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) {
-          setState(() => _selectedIndex = index);
-          switch (index) {
-            case 0:
-              context.go('/citizen/dashboard');
-              break;
-            case 1:
-              context.go('/citizen/map');
-              break;
-            case 2:
-              context.go('/citizen/history');
-              break;
-            case 3:
-              context.go('/citizen/profile');
-              break;
-          }
-        },
-        destinations: _destinations,
-        backgroundColor: AppTheme.surfaceContainerLowest,
-        elevation: 0,
-        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerLowest,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 16,
+              offset: const Offset(0, -4),
+            ),
+          ],
+        ),
+        child: NavigationBarTheme(
+          data: NavigationBarThemeData(
+            indicatorColor: cs.primary.withOpacity(0.1),
+            labelTextStyle: WidgetStateProperty.resolveWith((states) {
+              if (states.contains(WidgetState.selected)) {
+                return theme.textTheme.labelSmall?.copyWith(
+                  color: cs.primary,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 10,
+                );
+              }
+              return theme.textTheme.labelSmall?.copyWith(
+                color: cs.onSurface.withOpacity(0.6),
+                fontWeight: FontWeight.w700,
+                fontSize: 10,
+              );
+            }),
+            iconTheme: WidgetStateProperty.resolveWith((states) {
+              if (states.contains(WidgetState.selected)) {
+                return IconThemeData(color: cs.primary, size: 24);
+              }
+              return IconThemeData(color: cs.onSurface.withOpacity(0.6), size: 24);
+            }),
+          ),
+          child: NavigationBar(
+            selectedIndex: _selectedIndex,
+            onDestinationSelected: (index) {
+              setState(() => _selectedIndex = index);
+              switch (index) {
+                case 0:
+                  context.go('/citizen/dashboard');
+                  break;
+                case 1:
+                  context.go('/citizen/history'); // Reports
+                  break;
+                case 2:
+                  context.go('/citizen/map');
+                  break;
+                case 3:
+                  context.go('/citizen/profile');
+                  break;
+              }
+            },
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+            destinations: const [
+              NavigationDestination(
+                icon: Icon(Icons.home_filled),
+                label: 'HOME',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.assignment),
+                label: 'REPORTS',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.map),
+                label: 'MAP',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.person),
+                label: 'PROFILE',
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
-}
-
-/// Route configuration for citizen shell
-class CitizenRoutes {
-  static const String splash = '/citizen/splash';
-  static const String dashboard = '/citizen/dashboard';
-  static const String incidentDetails = '/citizen/incident-details';
-  static const String dispatchConfirm = '/citizen/dispatch-confirm';
-  static const String map = '/citizen/map';
-  static const String history = '/citizen/history';
-  static const String reportDetails = '/citizen/report-details';
-  static const String profile = '/citizen/profile';
 }

@@ -80,48 +80,76 @@ WSGI_APPLICATION = 'rapid_aid.wsgi.application'
 
 # ── GeoDjango Windows Configuration ──────────────────────────
 if os.name == 'nt':
-    # Fallback to fiona wheels if OSGeo4W isn't perfectly configured
-    fiona_libs = BASE_DIR / '.venv' / 'Lib' / 'site-packages' / 'fiona.libs'
-    
-    osgeo4w_paths = [
-        r"C:\OSGeo4W64",
-        r"C:\OSGeo4W",
-    ]
-    osgeo_path = next((p for p in osgeo4w_paths if os.path.exists(p)), None)
-    
-    if fiona_libs.exists():
-        # Fiona installed via pip
-        os.environ['PATH'] = str(fiona_libs) + ';' + os.environ.get('PATH', '')
-        gdal_dlls = glob.glob(str(fiona_libs / "gdal*.dll"))
-        if gdal_dlls:
-            GDAL_LIBRARY_PATH = gdal_dlls[0]
-        geos_dlls = glob.glob(str(fiona_libs / "geos_c*.dll"))
-        if geos_dlls:
-            GEOS_LIBRARY_PATH = geos_dlls[0]
+    import glob
+    _site_packages = BASE_DIR / '.venv' / 'Lib' / 'site-packages'
 
-    elif osgeo_path and os.path.exists(os.path.join(osgeo_path, 'bin')):
-        # Traditional OSGeo4W
-        bin_path = os.path.join(osgeo_path, 'bin')
-        os.environ['PATH'] = bin_path + ';' + os.environ.get('PATH', '')
-        os.environ['PROJ_LIB'] = os.path.join(osgeo_path, 'share', 'proj')
-        
-        gdal_dlls = glob.glob(os.path.join(bin_path, "gdal*.dll"))
-        if gdal_dlls:
-            GDAL_LIBRARY_PATH = gdal_dlls[0]
-        geos_dlls = glob.glob(os.path.join(bin_path, "geos_c*.dll"))
+    # 1) Try GEOS from shapely.libs (bundled wheel, always present on Windows)
+    shapely_libs = _site_packages / 'shapely.libs'
+    if shapely_libs.exists():
+        geos_dlls = glob.glob(str(shapely_libs / 'geos_c*.dll'))
         if geos_dlls:
             GEOS_LIBRARY_PATH = geos_dlls[0]
+        os.environ['PATH'] = str(shapely_libs) + ';' + os.environ.get('PATH', '')
+
+    # 2) Try GDAL from pyproj.libs (pyproj wheel bundles proj/gdal on Windows)
+    pyproj_libs = _site_packages / 'pyproj.libs'
+    if pyproj_libs.exists():
+        gdal_dlls = glob.glob(str(pyproj_libs / 'gdal*.dll'))
+        if gdal_dlls:
+            GDAL_LIBRARY_PATH = gdal_dlls[0]
+        os.environ['PATH'] = str(pyproj_libs) + ';' + os.environ.get('PATH', '')
+
+    # 3) Try OSGeo4W as final fallback
+    if 'GDAL_LIBRARY_PATH' not in dir():
+        for osgeo_path in [r'C:\OSGeo4W64', r'C:\OSGeo4W']:
+            if os.path.exists(osgeo_path):
+                bin_path = os.path.join(osgeo_path, 'bin')
+                os.environ['PATH'] = bin_path + ';' + os.environ.get('PATH', '')
+                os.environ['PROJ_LIB'] = os.path.join(osgeo_path, 'share', 'proj')
+                gdal_dlls = glob.glob(os.path.join(bin_path, 'gdal*.dll'))
+                if gdal_dlls:
+                    GDAL_LIBRARY_PATH = gdal_dlls[0]
+                geos_dlls = glob.glob(os.path.join(bin_path, 'geos_c*.dll'))
+                if geos_dlls:
+                    GEOS_LIBRARY_PATH = geos_dlls[0]
+                break
 
 # Database Setup (PostGIS via dj-database-url)
+# Detect if GDAL is available to pick the right backend
+_gdal_available = 'GDAL_LIBRARY_PATH' in dir() or os.environ.get('GDAL_LIBRARY_PATH')
+if not _gdal_available:
+    # Try to load GDAL to see if it's on the system PATH
+    import ctypes
+    for _gdal_name in ['gdal308', 'gdal307', 'gdal306', 'gdal305', 'gdal304', 'gdal303', 'gdal302', 'gdal301', 'gdal300', 'gdal']:
+        try:
+            ctypes.cdll.LoadLibrary(_gdal_name)
+            _gdal_available = True
+            break
+        except OSError:
+            pass
+
+_db_engine = 'django.contrib.gis.db.backends.postgis' if _gdal_available else 'django.db.backends.postgresql'
+
+if not _gdal_available:
+    # Remove GeoDjango app when GDAL is unavailable (local Windows dev without OSGeo4W)
+    import warnings
+    warnings.warn(
+        "GDAL not found — using plain PostgreSQL backend. GeoDjango spatial features disabled. "
+        "Install OSGeo4W or GDAL to enable full spatial support.",
+        RuntimeWarning
+    )
+    INSTALLED_APPS = [app for app in INSTALLED_APPS if app != 'django.contrib.gis']
+
 DATABASES = {
     'default': dj_database_url.config(
         default=config('DATABASE_URL'),
         conn_max_age=600,
         ssl_require=True,
-        engine='django.contrib.gis.db.backends.postgis'
+        engine=_db_engine,
     )
 }
 # Supabase requires SSL, so we set ssl_require=True and ensure engine is postgis.
+
 
 # Channels Layer — prefers Redis, falls back to InMemory for local dev without Redis
 _REDIS_URL = config('REDIS_URL', default='')

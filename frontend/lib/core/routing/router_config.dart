@@ -18,9 +18,9 @@ import '../../features/auth/presentation/reset_password_screen.dart';
 import '../../features/auth/presentation/security_updated_splash.dart';
 import '../../features/citizen/presentation/citizen_shell.dart';
 import '../../features/citizen/presentation/citizen_splash_screen.dart';
-import '../../features/citizen/presentation/citizen_dashboard_screen.dart';
-import '../../features/citizen/presentation/citizen_incident_details_screen.dart';
-import '../../features/citizen/presentation/citizen_dispatch_confirm_screen.dart';
+import '../../features/citizen/presentation/citizen_dashboard.dart';
+import '../../features/citizen/presentation/input_emergency_details.dart';
+import '../../features/citizen/presentation/confirm_dispatch.dart';
 import '../../features/citizen/presentation/citizen_map_screen.dart';
 import '../../features/citizen/presentation/citizen_history_screen.dart';
 import '../../features/citizen/presentation/citizen_profile_screen.dart';
@@ -133,7 +133,7 @@ class AppRouter {
           ),
           GoRoute(
             path: '/citizen/dashboard',
-            builder: (context, state) => CitizenDashboardScreen(),
+            builder: (context, state) => const CitizenDashboard(),
           ),
           GoRoute(
             path: '/citizen/map',
@@ -160,13 +160,18 @@ class AppRouter {
       GoRoute(
         path: '/citizen/incident-details',
         builder: (context, state) {
-          return CitizenIncidentDetailsScreen();
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          final type = extra['type'] as String? ?? 'Medical';
+          return InputEmergencyDetails(emergencyType: type);
         },
       ),
       GoRoute(
         path: '/citizen/dispatch-confirm',
         builder: (context, state) {
-          return CitizenDispatchConfirmScreen();
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          final type = extra['type'] as String? ?? 'Medical';
+          final desc = extra['description'] as String? ?? '';
+          return ConfirmDispatch(emergencyType: type, description: desc);
         },
       ),
 
