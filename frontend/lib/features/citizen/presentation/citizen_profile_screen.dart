@@ -3,14 +3,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/theme.dart';
-import '../../../core/widgets/action_button.dart';
-import '../../../core/widgets/auth_text_field.dart';
+import '../../../core/widgets/rapid_aid_logo.dart';
 import '../../auth/logic/auth_bloc.dart';
 import '../../auth/logic/auth_event.dart';
 
 /// Citizen Profile Screen
-/// Clean settings view using the same input widgets as the Signup screen
-/// Enforces strict lowercase email policy with Clinical Vanguard error toast
+/// High-end profile screen with futuristic UI elements matching the Vanguard aesthetic.
 class CitizenProfileScreen extends StatefulWidget {
   const CitizenProfileScreen({super.key});
 
@@ -19,15 +17,18 @@ class CitizenProfileScreen extends StatefulWidget {
 }
 
 class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
-  final _nameController = TextEditingController(text: 'John Doe');
-  final _emailController = TextEditingController(text: 'citizen@rapidaid.org');
-  final _phoneController = TextEditingController(text: '+1 234 567 8900');
+  final _nameController = TextEditingController(text: 'Alex Henderson');
+  final _phoneController = TextEditingController(text: '+1 (555) 123-4567');
+  final _emailController = TextEditingController(text: 'alex.h@rapidaid.org');
+
+  bool _isDarkTheme = false;
+  bool _isLocationEnabled = true;
 
   @override
   void dispose() {
     _nameController.dispose();
-    _emailController.dispose();
     _phoneController.dispose();
+    _emailController.dispose();
     super.dispose();
   }
 
@@ -87,203 +88,449 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final cs = theme.colorScheme;
 
     return Scaffold(
-      backgroundColor: AppTheme.backgroundBase,
+      backgroundColor: const Color(0xFFF8F9FA), // Clean light background
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 16),
+        child: Column(
+          children: [
+            // Fixed Custom Topbar
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: RapidAidLogo(size: 28, iconSize: 26),
+                  ),
+                  Text(
+                    'YOUR PROFILE',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: const Color(0xFF0B192C),
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
-                // Header
-                Text(
-                  'PROFILE',
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    letterSpacing: 1.0,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Account Settings',
-                  style: theme.textTheme.headlineMedium?.copyWith(
-                    color: AppTheme.headingColor,
-                  ),
-                ),
-                const SizedBox(height: 32),
-
-                // Profile Card
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: AppTheme.surfaceContainerLowest,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.06),
-                        offset: const Offset(0, 12),
-                        blurRadius: 24,
-                        spreadRadius: -4,
-                      ),
-                    ],
-                  ),
+            // Scrollable Content
+            Expanded(
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Full Name
-                      AuthTextField(
-                        label: 'FULL NAME',
-                        hintText: 'John Doe',
+                      const SizedBox(height: 24),
+                      // Avatar
+                      GestureDetector(
+                        onTap: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: const Text('Image picker opened...'),
+                              backgroundColor: const Color(0xFF004F9F),
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          );
+                        },
+                        child: Stack(
+                          alignment: Alignment.bottomRight,
+                          children: [
+                            Container(
+                              width: 120,
+                              height: 120,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: cs.surfaceContainerHigh,
+                                border: Border.all(color: Colors.white, width: 4),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.08),
+                                    blurRadius: 16,
+                                    offset: const Offset(0, 8),
+                                  ),
+                                ],
+                              ),
+                              child: ClipOval(
+                                child: Icon(Icons.person,
+                                    size: 70, color: cs.onSurface.withOpacity(0.4)),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF004F9F), // Rapid Aid Blue
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 3),
+                              ),
+                              child: const Icon(Icons.edit,
+                                  color: Colors.white, size: 18),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 40),
+
+                      // Text Fields
+                      _ProfileTextField(
+                        label: 'Full Name',
                         controller: _nameController,
                       ),
                       const SizedBox(height: 20),
-
-                      // Email
-                      AuthTextField(
-                        label: 'EMAIL ADDRESS',
-                        hintText: 'citizen@rapidaid.org',
+                      _ProfileTextField(
+                        label: 'Phone Number',
+                        controller: _phoneController,
+                      ),
+                      const SizedBox(height: 20),
+                      _ProfileTextField(
+                        label: 'Email Address',
                         controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        forceLowercase: true,
-                        onErrorStateChanged: (hasError) {
-                          if (hasError) {
+                        enabled: false,
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Save Changes Button
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton(
+                          onPressed: () {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: const Text(
-                                  'Email must be in strictly lowercase letters.',
-                                ),
-                                backgroundColor: AppTheme.emergencyUrl,
+                                content: const Text('Profile saved successfully'),
+                                backgroundColor: const Color(0xFF004F9F),
                                 behavior: SnackBarBehavior.floating,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                               ),
                             );
-                          }
-                        },
-                      ),
-                      const SizedBox(height: 20),
-
-                      // Phone
-                      AuthTextField(
-                        label: 'PHONE NUMBER',
-                        hintText: '+1 234 567 8900',
-                        controller: _phoneController,
-                        keyboardType: TextInputType.phone,
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Save Button
-                      ActionButton(
-                        label: 'Save Changes',
-                        onPressed: () {
-                          // TODO: Implement save logic
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: const Text('Profile updated successfully'),
-                              backgroundColor: AppTheme.primary,
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF004F9F),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(25),
                             ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 32),
-
-                // Danger Zone
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: AppTheme.surfaceContainerLowest,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.06),
-                        offset: const Offset(0, 12),
-                        blurRadius: 24,
-                        spreadRadius: -4,
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'DANGER ZONE',
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: AppTheme.emergencyUrl,
-                          letterSpacing: 1.0,
+                            elevation: 0,
+                          ),
+                          child: Text(
+                            'Save Changes',
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 32),
 
-                      // Sign Out Button
-                      ActionButton(
-                        label: 'Sign Out',
-                        isEmergency: true,
-                        onPressed: () => _showSignOutDialog(context),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Delete Account
-                      GestureDetector(
-                        onTap: () {
-                          // TODO: Implement delete account
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: const Text(
-                                'Account deletion requires admin approval',
-                              ),
-                              backgroundColor: AppTheme.emergencyUrl,
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
+                      // Impact Summary
+                      Container(
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.03),
+                              blurRadius: 16,
+                              offset: const Offset(0, 8),
                             ),
-                          );
-                        },
-                        child: Row(
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Container(
-                              width: 36,
-                              height: 36,
-                              decoration: BoxDecoration(
-                                color: AppTheme.emergencyUrl.withOpacity(0.15),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Icon(
-                                Icons.delete_outline,
-                                color: AppTheme.emergencyUrl,
-                                size: 20,
+                            Text(
+                              'IMPACT SUMMARY',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: cs.onSurface.withOpacity(0.5),
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1.0,
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(height: 12),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    'Total Reports Submitted',
+                                    style: theme.textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                                Container(
+                                  width: 60,
+                                  height: 60,
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.emergencyUrl.withOpacity(0.2),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      '12',
+                                      style: theme.textTheme.headlineSmall?.copyWith(
+                                        color: AppTheme.emergencyUrl,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            // Progress Bar
+                            Container(
+                              height: 6,
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                color: cs.onSurface.withOpacity(0.05),
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                              child: FractionallySizedBox(
+                                alignment: Alignment.centerLeft,
+                                widthFactor: 0.75, // Just visual
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF004F9F),
+                                    borderRadius: BorderRadius.circular(3),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
                             Text(
-                              'Delete Account',
-                              style: theme.textTheme.bodyLarge?.copyWith(
-                                color: AppTheme.emergencyUrl,
-                                fontWeight: FontWeight.w600,
+                              'Top 5% of active community responders',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: cs.onSurface.withOpacity(0.6),
                               ),
                             ),
                           ],
                         ),
                       ),
+                      const SizedBox(height: 40),
+
+                      // System Settings Header
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'SYSTEM SETTINGS',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: cs.onSurface.withOpacity(0.6),
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.0,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Settings Card
+                      Container(
+                        decoration: BoxDecoration(
+                          color: cs.surfaceContainerLowest.withOpacity(0.5),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Column(
+                          children: [
+                            // Dark Theme
+                            Padding(
+                              padding: const EdgeInsets.all(20.0),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.dark_mode,
+                                      color: cs.onSurface.withOpacity(0.6)),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Dark Theme',
+                                          style: theme.textTheme.titleSmall
+                                              ?.copyWith(fontWeight: FontWeight.w700),
+                                        ),
+                                        Text(
+                                          'Reduce eye strain at night',
+                                          style: theme.textTheme.bodySmall
+                                              ?.copyWith(
+                                                  color: cs.onSurface
+                                                      .withOpacity(0.6)),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Switch(
+                                    value: _isDarkTheme,
+                                    onChanged: (val) =>
+                                        setState(() => _isDarkTheme = val),
+                                    activeColor: const Color(0xFF004F9F),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Divider(
+                                height: 1, color: cs.onSurface.withOpacity(0.05)),
+                            // Location Services
+                            Padding(
+                              padding: const EdgeInsets.all(20.0),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.location_on,
+                                      color: cs.onSurface.withOpacity(0.6)),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Location Services',
+                                          style: theme.textTheme.titleSmall
+                                              ?.copyWith(fontWeight: FontWeight.w700),
+                                        ),
+                                        Text(
+                                          'Improve aid response accuracy',
+                                          style: theme.textTheme.bodySmall
+                                              ?.copyWith(
+                                                  color: cs.onSurface
+                                                      .withOpacity(0.6)),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Switch(
+                                    value: _isLocationEnabled,
+                                    onChanged: (val) =>
+                                        setState(() => _isLocationEnabled = val),
+                                    activeColor: const Color(0xFF004F9F),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 48),
+
+                      // Delete Button
+                      Center(
+                        child: TextButton.icon(
+                          onPressed: () {},
+                          icon: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: AppTheme.emergencyUrl,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Icon(Icons.close,
+                                color: Colors.white, size: 14),
+                          ),
+                          label: Text(
+                            "Delete User's Report Data",
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              color: AppTheme.emergencyUrl,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Sign Out
+                      SizedBox(
+                        width: double.infinity,
+                        height: 56,
+                        child: ElevatedButton(
+                          onPressed: () => _showSignOutDialog(context),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF004F9F), // Rapid Aid Blue
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(28),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: Text(
+                            'Sign Out',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 48),
                     ],
                   ),
                 ),
-                const SizedBox(height: 48),
-              ],
+              ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Custom TextField for Profile matching the mockup's floating label style
+class _ProfileTextField extends StatelessWidget {
+  final String label;
+  final TextEditingController controller;
+  final bool enabled;
+
+  const _ProfileTextField({
+    required this.label,
+    required this.controller,
+    this.enabled = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return TextField(
+      controller: controller,
+      enabled: enabled,
+      style: theme.textTheme.titleMedium?.copyWith(
+        color: enabled ? cs.onSurface : cs.onSurface.withOpacity(0.6),
+        fontWeight: FontWeight.w500,
+      ),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: theme.textTheme.labelMedium?.copyWith(
+          color: const Color(0xFF004F9F),
+          fontWeight: FontWeight.w700,
+        ),
+        filled: true,
+        fillColor: enabled
+            ? Colors.white.withOpacity(0.5)
+            : cs.onSurface.withOpacity(0.03),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(
+            color: const Color(0xFF004F9F).withOpacity(0.3),
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(
+            color: Color(0xFF004F9F),
+            width: 2,
+          ),
+        ),
+        disabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(
+            color: cs.onSurface.withOpacity(0.1),
           ),
         ),
       ),
