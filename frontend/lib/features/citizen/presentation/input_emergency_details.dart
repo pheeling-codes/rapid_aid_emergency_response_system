@@ -3,6 +3,9 @@ import 'package:go_router/go_router.dart';
 import 'dart:ui';
 import '../../../core/theme/theme.dart';
 import '../../../core/widgets/ambient_shadow.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
 
 class InputEmergencyDetails extends StatefulWidget {
   final String emergencyType;
@@ -21,6 +24,8 @@ class _InputEmergencyDetailsState extends State<InputEmergencyDetails> {
   final FocusNode _focusNode = FocusNode();
   bool _isFocused = false;
   String _errorMessage = '';
+  String? _evidenceImageUrl;
+  String? _evidenceFileName;
 
   @override
   void initState() {
@@ -308,71 +313,132 @@ class _InputEmergencyDetailsState extends State<InputEmergencyDetails> {
                     const SizedBox(height: 12),
 
                     // Evidence Upload Box (Dashed style via custom painter or simple container)
-                    CustomPaint(
-                      painter: _DashedRectPainter(
-                          color: cs.onSurface.withOpacity(0.15)),
-                      child: Container(
-                        height: 140,
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          color: cs.surfaceContainerLowest,
-                          borderRadius: BorderRadius.circular(12.0),
-                        ),
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
+                    MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: CustomPaint(
+                        painter: _DashedRectPainter(
+                            color: _evidenceImageUrl != null
+                                ? Colors.transparent
+                                : cs.onSurface.withOpacity(0.15)),
+                        child: Container(
+                          height: 160,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: cs.surfaceContainerLowest,
                             borderRadius: BorderRadius.circular(12.0),
-                            onTap: () {
-                              // Media selection logic
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: const Text(
-                                      'Media upload functionality coming soon.'),
-                                  backgroundColor: cs.primary,
-                                  behavior: SnackBarBehavior.floating,
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12)),
-                                ),
-                              );
-                            },
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(16.0),
-                                  decoration: const BoxDecoration(
-                                    color: Colors.white,
-                                    shape: BoxShape.circle,
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Color(0x0A000000),
-                                        blurRadius: 12,
-                                        offset: Offset(0, 4),
+                          ),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(12.0),
+                              onTap: () {
+                                if (kIsWeb) {
+                                  final input = html.FileUploadInputElement()
+                                    ..accept = 'image/*,video/*'
+                                    ..click();
+                                  input.onChange.listen((e) {
+                                    final files = input.files;
+                                    if (files != null && files.isNotEmpty) {
+                                      final objectUrl = html.Url
+                                          .createObjectUrlFromBlob(files[0]);
+                                      if (context.mounted) {
+                                        setState(() {
+                                          _evidenceImageUrl = objectUrl;
+                                          _evidenceFileName = files[0].name;
+                                        });
+                                      }
+                                    }
+                                  });
+                                }
+                              },
+                              child: _evidenceImageUrl != null
+                                  ? ClipRRect(
+                                      borderRadius: BorderRadius.circular(12.0),
+                                      child: Stack(
+                                        fit: StackFit.expand,
+                                        children: [
+                                          Image.network(
+                                            _evidenceImageUrl!,
+                                            fit: BoxFit.cover,
+                                          ),
+                                          // Overlay with filename + tap to change
+                                          Positioned(
+                                            bottom: 0,
+                                            left: 0,
+                                            right: 0,
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(
+                                                  horizontal: 12, vertical: 8),
+                                              color: Colors.black54,
+                                              child: Row(
+                                                children: [
+                                                  const Icon(Icons.image,
+                                                      color: Colors.white,
+                                                      size: 16),
+                                                  const SizedBox(width: 8),
+                                                  Expanded(
+                                                    child: Text(
+                                                      _evidenceFileName ?? '',
+                                                      style: const TextStyle(
+                                                          color: Colors.white,
+                                                          fontSize: 12),
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                  const Icon(Icons.edit,
+                                                      color: Colors.white70,
+                                                      size: 14),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                    ],
-                                  ),
-                                  child: Icon(
-                                    Icons.camera_alt,
-                                    color: cs.primary,
-                                    size: 28,
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  'Attach Photo/Video',
-                                  style: theme.textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                    color: cs.onSurface,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Capture or select from gallery',
-                                  style: theme.textTheme.labelMedium?.copyWith(
-                                    color: cs.onSurface.withOpacity(0.5),
-                                  ),
-                                ),
-                              ],
+                                    )
+                                  : Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(16.0),
+                                          decoration: const BoxDecoration(
+                                            color: Colors.white,
+                                            shape: BoxShape.circle,
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Color(0x0A000000),
+                                                blurRadius: 12,
+                                                offset: Offset(0, 4),
+                                              ),
+                                            ],
+                                          ),
+                                          child: Icon(
+                                            Icons.camera_alt,
+                                            color: cs.primary,
+                                            size: 28,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 16),
+                                        Text(
+                                          'Attach Photo/Video',
+                                          style: theme.textTheme.titleMedium
+                                              ?.copyWith(
+                                            fontWeight: FontWeight.w700,
+                                            color: cs.onSurface,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'Capture or select from gallery',
+                                          style: theme.textTheme.labelMedium
+                                              ?.copyWith(
+                                            color:
+                                                cs.onSurface.withOpacity(0.5),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                             ),
                           ),
                         ),

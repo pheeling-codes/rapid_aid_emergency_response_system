@@ -6,6 +6,9 @@ import '../../../core/theme/theme.dart';
 import '../../../core/widgets/rapid_aid_logo.dart';
 import '../../auth/logic/auth_bloc.dart';
 import '../../auth/logic/auth_event.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
 
 /// Citizen Profile Screen
 /// High-end profile screen with futuristic UI elements matching the Vanguard aesthetic.
@@ -23,6 +26,7 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
 
   bool _isDarkTheme = false;
   bool _isLocationEnabled = true;
+  String? _profileImageUrl;
 
   @override
   void dispose() {
@@ -108,7 +112,7 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
                   Text(
                     'YOUR PROFILE',
                     style: theme.textTheme.titleMedium?.copyWith(
-                      color: const Color(0xFF0B192C),
+                      color: AppTheme.primary,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 0.5,
                     ),
@@ -126,53 +130,74 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
                     children: [
                       const SizedBox(height: 24),
                       // Avatar
-                      GestureDetector(
-                        onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: const Text('Image picker opened...'),
-                              backgroundColor: const Color(0xFF004F9F),
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                      MouseRegion(
+                        cursor: SystemMouseCursors.click,
+                        child: GestureDetector(
+                          onTap: () {
+                            if (kIsWeb) {
+                              final input = html.FileUploadInputElement()
+                                ..accept = 'image/*'
+                                ..click();
+                              input.onChange.listen((e) {
+                                final files = input.files;
+                                if (files != null && files.isNotEmpty) {
+                                  final objectUrl =
+                                      html.Url.createObjectUrlFromBlob(files[0]);
+                                  if (context.mounted) {
+                                    setState(() {
+                                      _profileImageUrl = objectUrl;
+                                    });
+                                  }
+                                }
+                              });
+                            }
+                          },
+                          child: Stack(
+                            alignment: Alignment.bottomRight,
+                            children: [
+                              Container(
+                                width: 120,
+                                height: 120,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: cs.surfaceContainerHigh,
+                                  border:
+                                      Border.all(color: Colors.white, width: 4),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.08),
+                                      blurRadius: 16,
+                                      offset: const Offset(0, 8),
+                                    ),
+                                  ],
+                                ),
+                                child: ClipOval(
+                                  child: _profileImageUrl != null
+                                      ? Image.network(
+                                          _profileImageUrl!,
+                                          fit: BoxFit.cover,
+                                          width: 120,
+                                          height: 120,
+                                        )
+                                      : Icon(Icons.person,
+                                          size: 70,
+                                          color: cs.onSurface.withOpacity(0.4)),
+                                ),
                               ),
-                            ),
-                          );
-                        },
-                        child: Stack(
-                          alignment: Alignment.bottomRight,
-                          children: [
-                            Container(
-                              width: 120,
-                              height: 120,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: cs.surfaceContainerHigh,
-                                border: Border.all(color: Colors.white, width: 4),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.08),
-                                    blurRadius: 16,
-                                    offset: const Offset(0, 8),
-                                  ),
-                                ],
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color:
+                                      const Color(0xFF004F9F), // Rapid Aid Blue
+                                  shape: BoxShape.circle,
+                                  border:
+                                      Border.all(color: Colors.white, width: 3),
+                                ),
+                                child: const Icon(Icons.edit,
+                                    color: Colors.white, size: 18),
                               ),
-                              child: ClipOval(
-                                child: Icon(Icons.person,
-                                    size: 70, color: cs.onSurface.withOpacity(0.4)),
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF004F9F), // Rapid Aid Blue
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white, width: 3),
-                              ),
-                              child: const Icon(Icons.edit,
-                                  color: Colors.white, size: 18),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                       const SizedBox(height: 40),
@@ -203,7 +228,8 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
                           onPressed: () {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: const Text('Profile saved successfully'),
+                                content:
+                                    const Text('Profile saved successfully'),
                                 backgroundColor: const Color(0xFF004F9F),
                                 behavior: SnackBarBehavior.floating,
                                 shape: RoundedRectangleBorder(
@@ -262,7 +288,8 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
                                 Expanded(
                                   child: Text(
                                     'Total Reports Submitted',
-                                    style: theme.textTheme.titleMedium?.copyWith(
+                                    style:
+                                        theme.textTheme.titleMedium?.copyWith(
                                       fontWeight: FontWeight.w700,
                                     ),
                                   ),
@@ -271,13 +298,15 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
                                   width: 60,
                                   height: 60,
                                   decoration: BoxDecoration(
-                                    color: AppTheme.emergencyUrl.withOpacity(0.2),
+                                    color:
+                                        AppTheme.emergencyUrl.withOpacity(0.2),
                                     shape: BoxShape.circle,
                                   ),
                                   child: Center(
                                     child: Text(
                                       '12',
-                                      style: theme.textTheme.headlineSmall?.copyWith(
+                                      style: theme.textTheme.headlineSmall
+                                          ?.copyWith(
                                         color: AppTheme.emergencyUrl,
                                         fontWeight: FontWeight.w900,
                                       ),
@@ -350,12 +379,14 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
                                   const SizedBox(width: 16),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           'Dark Theme',
                                           style: theme.textTheme.titleSmall
-                                              ?.copyWith(fontWeight: FontWeight.w700),
+                                              ?.copyWith(
+                                                  fontWeight: FontWeight.w700),
                                         ),
                                         Text(
                                           'Reduce eye strain at night',
@@ -377,7 +408,8 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
                               ),
                             ),
                             Divider(
-                                height: 1, color: cs.onSurface.withOpacity(0.05)),
+                                height: 1,
+                                color: cs.onSurface.withOpacity(0.05)),
                             // Location Services
                             Padding(
                               padding: const EdgeInsets.all(20.0),
@@ -388,12 +420,14 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
                                   const SizedBox(width: 16),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           'Location Services',
                                           style: theme.textTheme.titleSmall
-                                              ?.copyWith(fontWeight: FontWeight.w700),
+                                              ?.copyWith(
+                                                  fontWeight: FontWeight.w700),
                                         ),
                                         Text(
                                           'Improve aid response accuracy',
@@ -407,8 +441,8 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
                                   ),
                                   Switch(
                                     value: _isLocationEnabled,
-                                    onChanged: (val) =>
-                                        setState(() => _isLocationEnabled = val),
+                                    onChanged: (val) => setState(
+                                        () => _isLocationEnabled = val),
                                     activeColor: const Color(0xFF004F9F),
                                   ),
                                 ],
@@ -450,7 +484,8 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
                         child: ElevatedButton(
                           onPressed: () => _showSignOutDialog(context),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF004F9F), // Rapid Aid Blue
+                            backgroundColor:
+                                const Color(0xFF004F9F), // Rapid Aid Blue
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(28),
                             ),

@@ -66,7 +66,8 @@ class _CitizenShellState extends State<CitizenShell> {
               if (states.contains(WidgetState.selected)) {
                 return IconThemeData(color: cs.primary, size: 24);
               }
-              return IconThemeData(color: cs.onSurface.withOpacity(0.6), size: 24);
+              return IconThemeData(
+                  color: cs.onSurface.withOpacity(0.6), size: 24);
             }),
           ),
           child: NavigationBar(

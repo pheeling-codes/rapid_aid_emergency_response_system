@@ -44,7 +44,7 @@ class ConfirmDispatch extends StatelessWidget {
             right: 0,
             height: MediaQuery.of(context).size.height * 0.45,
             child: Container(
-              color: Colors.blue.shade900, // Placeholder color for Map
+              color: Colors.blue.shade600, // Placeholder color for Map
               child: Stack(
                 children: [
                   // Map Graphic placeholder overlay could be an Image or decorated box
@@ -85,9 +85,10 @@ class ConfirmDispatch extends StatelessWidget {
             child: Column(
               children: [
                 // Custom Topbar
-                Padding(
+                Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 24.0, vertical: 16.0),
+                      horizontal: 24.0, vertical: 6.0),
+                  color: Colors.white,
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -127,6 +128,8 @@ class ConfirmDispatch extends StatelessWidget {
                     ],
                   ),
                 ),
+
+                const SizedBox(height: 6),
 
                 // GPS Fix Pill
                 Align(
