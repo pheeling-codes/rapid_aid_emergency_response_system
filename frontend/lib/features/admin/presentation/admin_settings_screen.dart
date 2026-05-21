@@ -1,8 +1,100 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
+
 import '../../../core/theme/theme.dart';
 
-class AdminSettingsScreen extends StatelessWidget {
+class AdminSettingsScreen extends StatefulWidget {
   const AdminSettingsScreen({super.key});
+
+  @override
+  State<AdminSettingsScreen> createState() => _AdminSettingsScreenState();
+}
+
+class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
+  String? _profileImageUrl;
+
+  void _showSignOutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: Colors.white,
+        title: const Text(
+          'Sign Out',
+          style: TextStyle(fontWeight: FontWeight.w800, color: AppTheme.headingColor),
+        ),
+        content: const Text(
+          'Are you sure you want to sign out of the Admin Dashboard?',
+          style: TextStyle(color: Color(0xFF6B7280)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF6B7280))),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.go('/login');
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('Sign Out', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showResetSystemDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: Colors.white,
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626)),
+            SizedBox(width: 8),
+            Text('CRITICAL WARNING', style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFFDC2626))),
+          ],
+        ),
+        content: const Text(
+          'Are you sure you want to completely RESET the system and permanently delete all user data? This action is irreversible and requires Level 5 God Mode clearance.',
+          style: TextStyle(color: Color(0xFF6B7280), height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF6B7280))),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text('System reset initiated. All data is being purged...'),
+                  backgroundColor: const Color(0xFFDC2626),
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('CONFIRM PURGE', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -58,23 +150,59 @@ class AdminSettingsScreen extends StatelessWidget {
                           ),
                           child: Column(
                             children: [
-                              Stack(
-                                alignment: Alignment.bottomRight,
-                                children: [
-                                  CircleAvatar(
-                                    radius: 60,
-                                    backgroundColor: const Color(0xFFF3F4F6),
-                                    child: Icon(Icons.person, size: 64, color: cs.onSurface.withOpacity(0.3)),
+                              MouseRegion(
+                                cursor: SystemMouseCursors.click,
+                                child: GestureDetector(
+                                  onTap: () {
+                                    if (kIsWeb) {
+                                      final input = html.FileUploadInputElement()
+                                        ..accept = 'image/*'
+                                        ..click();
+                                      input.onChange.listen((e) {
+                                        final files = input.files;
+                                        if (files != null && files.isNotEmpty) {
+                                          final objectUrl = html.Url.createObjectUrlFromBlob(files[0]);
+                                          if (mounted) {
+                                            setState(() {
+                                              _profileImageUrl = objectUrl;
+                                            });
+                                          }
+                                        }
+                                      });
+                                    }
+                                  },
+                                  child: Stack(
+                                    alignment: Alignment.bottomRight,
+                                    children: [
+                                      Container(
+                                        width: 120,
+                                        height: 120,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: const Color(0xFFF3F4F6),
+                                          border: Border.all(color: Colors.white, width: 4),
+                                          boxShadow: [
+                                            BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4)),
+                                          ],
+                                        ),
+                                        child: ClipOval(
+                                          child: _profileImageUrl != null
+                                              ? Image.network(_profileImageUrl!, fit: BoxFit.cover, width: 120, height: 120)
+                                              : Icon(Icons.person, size: 64, color: cs.onSurface.withOpacity(0.3)),
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF004F9F),
+                                          shape: BoxShape.circle,
+                                          border: Border.all(color: Colors.white, width: 2),
+                                        ),
+                                        child: const Icon(Icons.edit, color: Colors.white, size: 16),
+                                      ),
+                                    ],
                                   ),
-                                  Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: const BoxDecoration(
-                                      color: Color(0xFF004F9F),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(Icons.edit, color: Colors.white, size: 16),
-                                  ),
-                                ],
+                                ),
                               ),
                               const SizedBox(height: 24),
                               Text(
@@ -103,7 +231,7 @@ class AdminSettingsScreen extends StatelessWidget {
                               SizedBox(
                                 width: double.infinity,
                                 child: OutlinedButton(
-                                  onPressed: () {},
+                                  onPressed: () => _showSignOutDialog(context),
                                   style: OutlinedButton.styleFrom(
                                     padding: const EdgeInsets.symmetric(vertical: 16),
                                     side: const BorderSide(color: Color(0xFFDC2626)),
@@ -129,6 +257,8 @@ class AdminSettingsScreen extends StatelessWidget {
                           title: 'SYSTEM PREFERENCES',
                           icon: Icons.tune_rounded,
                           children: [
+                            _SettingsToggle(title: 'Admin View Only Theme', subtitle: 'Apply dedicated contrast styling strictly to admin terminal', value: true),
+                            const Divider(height: 1),
                             _SettingsToggle(title: 'Global Dark Mode', subtitle: 'Force dark theme across all operator terminals', value: false),
                             const Divider(height: 1),
                             _SettingsToggle(title: 'High-Contrast Maps', subtitle: 'Enhance visibility of map routes and markers', value: true),
@@ -141,8 +271,6 @@ class AdminSettingsScreen extends StatelessWidget {
                           title: 'NOTIFICATION PROTOCOLS',
                           icon: Icons.notifications_active_rounded,
                           children: [
-                            _SettingsToggle(title: 'Priority 1 Alarms', subtitle: 'Audible siren for critical life-threatening incidents', value: true),
-                            const Divider(height: 1),
                             _SettingsToggle(title: 'Unit Offline Alerts', subtitle: 'Notify when a responder unit loses GPS connection', value: true),
                             const Divider(height: 1),
                             _SettingsToggle(title: 'Citizen Report Ping', subtitle: 'Subtle chime when a new civilian report enters the queue', value: false),
@@ -150,8 +278,9 @@ class AdminSettingsScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 32),
                         _SettingsSection(
-                          title: 'DATA RETENTION',
-                          icon: Icons.storage_rounded,
+                          title: 'DATA RETENTION & COMPLIANCE',
+                          icon: Icons.security_rounded,
+                          isDanger: true,
                           children: [
                             Padding(
                               padding: const EdgeInsets.all(24),
@@ -161,14 +290,17 @@ class AdminSettingsScreen extends StatelessWidget {
                                   Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text('Incident Logs Archive', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800, color: AppTheme.headingColor)),
+                                      Text('System Wipe / Data Purge', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800, color: const Color(0xFFDC2626))),
                                       const SizedBox(height: 4),
-                                      Text('Current retention policy: 7 Years', style: theme.textTheme.bodySmall?.copyWith(color: const Color(0xFF6B7280))),
+                                      Text('Permanently delete ALL user and incident data', style: theme.textTheme.bodySmall?.copyWith(color: const Color(0xFF6B7280))),
                                     ],
                                   ),
-                                  OutlinedButton(
-                                    onPressed: () {},
-                                    child: const Text('Modify Policy'),
+                                  ElevatedButton(
+                                    onPressed: () => _showResetSystemDialog(context),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFFDC2626),
+                                    ),
+                                    child: const Text('RESET SYSTEM', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
                                   ),
                                 ],
                               ),
@@ -217,24 +349,26 @@ class _SettingsSection extends StatelessWidget {
   final String title;
   final IconData icon;
   final List<Widget> children;
+  final bool isDanger;
 
-  const _SettingsSection({required this.title, required this.icon, required this.children});
+  const _SettingsSection({required this.title, required this.icon, required this.children, this.isDanger = false});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final color = isDanger ? const Color(0xFFDC2626) : const Color(0xFF004F9F);
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Icon(icon, color: const Color(0xFF004F9F), size: 20),
+            Icon(icon, color: color, size: 20),
             const SizedBox(width: 12),
             Text(
               title,
               style: theme.textTheme.labelSmall?.copyWith(
-                color: const Color(0xFF004F9F),
+                color: color,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 1.5,
               ),
@@ -246,6 +380,7 @@ class _SettingsSection extends StatelessWidget {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
+            border: isDanger ? Border.all(color: const Color(0xFFFEE2E2), width: 2) : null,
             boxShadow: [
               BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4)),
             ],

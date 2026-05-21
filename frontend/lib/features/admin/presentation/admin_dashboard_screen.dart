@@ -1,13 +1,79 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/theme.dart';
 
-class AdminDashboardScreen extends StatelessWidget {
+class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
+
+  @override
+  State<AdminDashboardScreen> createState() => _AdminDashboardScreenState();
+}
+
+class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
+  int _selectedIncidentIndex = 0;
+  int _selectedUnitIndex = 0;
+
+  final List<Map<String, dynamic>> _incidents = [
+    {
+      'type': 'MEDICAL',
+      'typeColor': const Color(0xFFDC2626),
+      'title': 'Cardiac Arrest',
+      'address': '402 W 51st St, New York',
+      'fullAddress': '402 W 51st St, New York, NY 10019',
+      'time': '2m ago',
+      'reporter': 'Jane Doe (Bystander)',
+      'notes': '"Patient collapsed in pharmacy. Unresponsive. Bystander started CPR."',
+      'icon': Icons.monitor_heart,
+      'priority': 'PRIORITY 1 CRITICAL',
+    },
+    {
+      'type': 'FIRE',
+      'typeColor': const Color(0xFFF59E0B),
+      'title': 'Building Fire',
+      'address': '128 8th Ave, New York',
+      'fullAddress': '128 8th Ave, New York, NY 10011',
+      'time': '8m ago',
+      'reporter': 'John Smith',
+      'notes': '"Smoke coming from 3rd floor window. Evacuation in progress."',
+      'icon': Icons.local_fire_department,
+      'priority': 'PRIORITY 1 URGENT',
+    },
+    {
+      'type': 'ACCIDENT',
+      'typeColor': const Color(0xFF3B82F6),
+      'title': 'Vehicle Collision',
+      'address': 'Metropolitan Ave',
+      'fullAddress': '1901 Metropolitan Ave, New York, NY 10029',
+      'time': '15m ago',
+      'reporter': 'Dr. Alan Grant',
+      'notes': '"Two vehicle collision. One driver trapped."',
+      'icon': Icons.car_crash,
+      'priority': 'URGENT DISPATCH',
+    },
+    {
+      'type': 'SECURITY',
+      'typeColor': const Color(0xFF8B5CF6),
+      'title': 'Intrusion Alarm',
+      'address': '7th Avenue Bank',
+      'fullAddress': '7th Avenue Bank, New York, NY 10036',
+      'time': '20m ago',
+      'reporter': 'Automated System',
+      'notes': '"Silent alarm triggered at main vault."',
+      'icon': Icons.security,
+      'priority': 'SECURITY DISPATCH',
+    },
+  ];
+
+  final List<Map<String, dynamic>> _units = [
+    {'name': 'Unit 7A (ALS)', 'distance': '0.8 mi', 'eta': 'ETA: 3 mins'},
+    {'name': 'Unit 12B (BLS)', 'distance': '1.4 mi', 'eta': 'ETA: 6 mins'},
+    {'name': 'Rapid Response 4', 'distance': '2.1 mi', 'eta': 'ETA: 8 mins'},
+  ];
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final selectedIncident = _incidents[_selectedIncidentIndex];
 
     return Scaffold(
       backgroundColor: cs.surfaceContainerLowest,
@@ -40,8 +106,11 @@ class AdminDashboardScreen extends StatelessWidget {
                       color: const Color(0xFFF3F4F6),
                       borderRadius: BorderRadius.circular(20),
                     ),
+                    alignment: Alignment.center,
                     child: TextField(
+                      textAlignVertical: TextAlignVertical.center,
                       decoration: InputDecoration(
+                        isDense: true,
                         hintText: 'Search incidents, units...',
                         hintStyle: theme.textTheme.bodySmall?.copyWith(
                           color: cs.onSurface.withOpacity(0.5),
@@ -49,7 +118,7 @@ class AdminDashboardScreen extends StatelessWidget {
                         prefixIcon: Icon(Icons.search,
                             size: 18, color: cs.onSurface.withOpacity(0.5)),
                         border: InputBorder.none,
-                        contentPadding: const EdgeInsets.only(top: -4),
+                        contentPadding: EdgeInsets.zero,
                       ),
                     ),
                   ),
@@ -136,32 +205,27 @@ class AdminDashboardScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 16),
                       Expanded(
-                        child: ListView(
-                          children: [
-                            _IncidentCard(
-                              type: 'CRITICAL AID',
-                              typeColor: const Color(0xFFDC2626),
-                              title: 'Cardiac Arrest',
-                              address: '402 W 51st St, New York',
-                              time: '2m ago',
-                            ),
-                            const SizedBox(height: 12),
-                            _IncidentCard(
-                              type: 'RESPIRATORY',
-                              typeColor: const Color(0xFFF59E0B),
-                              title: 'Difficulty Breathing',
-                              address: '128 8th Ave, New York',
-                              time: '8m ago',
-                            ),
-                            const SizedBox(height: 12),
-                            _IncidentCard(
-                              type: 'TRANSPORT',
-                              typeColor: const Color(0xFF3B82F6),
-                              title: 'Non-Emergency Transfer',
-                              address: 'Metropolitan Hospital Center',
-                              time: '15m ago',
-                            ),
-                          ],
+                        child: ListView.builder(
+                          itemCount: _incidents.length,
+                          itemBuilder: (context, index) {
+                            final inc = _incidents[index];
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 12.0),
+                              child: _IncidentCard(
+                                type: inc['type'],
+                                typeColor: inc['typeColor'],
+                                title: inc['title'],
+                                address: inc['address'],
+                                time: inc['time'],
+                                isSelected: _selectedIncidentIndex == index,
+                                onTap: () {
+                                  setState(() {
+                                    _selectedIncidentIndex = index;
+                                  });
+                                },
+                              ),
+                            );
+                          },
                         ),
                       ),
                     ],
@@ -192,7 +256,7 @@ class AdminDashboardScreen extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.all(24),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFFF1F2), // Light red bg
+                            color: selectedIncident['typeColor'].withOpacity(0.05),
                             border: Border(bottom: BorderSide(color: cs.onSurface.withOpacity(0.05))),
                           ),
                           child: Column(
@@ -202,27 +266,27 @@ class AdminDashboardScreen extends StatelessWidget {
                                 children: [
                                   Container(
                                     padding: const EdgeInsets.all(8),
-                                    decoration: const BoxDecoration(
-                                      color: Color(0xFFDC2626),
+                                    decoration: BoxDecoration(
+                                      color: selectedIncident['typeColor'],
                                       shape: BoxShape.circle,
                                     ),
-                                    child: const Icon(Icons.monitor_heart, color: Colors.white, size: 20),
+                                    child: Icon(selectedIncident['icon'], color: Colors.white, size: 20),
                                   ),
                                   const SizedBox(width: 12),
                                   Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        'PRIORITY 1 CRITICAL',
+                                        selectedIncident['priority'],
                                         style: theme.textTheme.labelSmall?.copyWith(
-                                          color: const Color(0xFFDC2626),
+                                          color: selectedIncident['typeColor'],
                                           fontWeight: FontWeight.w800,
                                           fontSize: 10,
                                           letterSpacing: 1.0,
                                         ),
                                       ),
                                       Text(
-                                        'Cardiac Arrest',
+                                        selectedIncident['title'],
                                         style: theme.textTheme.titleMedium?.copyWith(
                                           fontWeight: FontWeight.w900,
                                           color: AppTheme.headingColor,
@@ -237,11 +301,13 @@ class AdminDashboardScreen extends StatelessWidget {
                                 children: [
                                   const Icon(Icons.location_on, size: 14, color: Color(0xFF6B7280)),
                                   const SizedBox(width: 8),
-                                  Text(
-                                    '402 W 51st St, New York, NY 10019',
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: const Color(0xFF4B5563),
-                                      fontWeight: FontWeight.w500,
+                                  Expanded(
+                                    child: Text(
+                                      selectedIncident['fullAddress'],
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color: const Color(0xFF4B5563),
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -251,11 +317,13 @@ class AdminDashboardScreen extends StatelessWidget {
                                 children: [
                                   const Icon(Icons.person, size: 14, color: Color(0xFF6B7280)),
                                   const SizedBox(width: 8),
-                                  Text(
-                                    'Reported by Jane Doe (Bystander)',
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: const Color(0xFF4B5563),
-                                      fontWeight: FontWeight.w500,
+                                  Expanded(
+                                    child: Text(
+                                      'Reported by ${selectedIncident['reporter']}',
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color: const Color(0xFF4B5563),
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -268,7 +336,7 @@ class AdminDashboardScreen extends StatelessWidget {
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
-                                  '"Patient collapsed in pharmacy. Unresponsive. Bystander started CPR."',
+                                  selectedIncident['notes'],
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     fontStyle: FontStyle.italic,
                                     color: const Color(0xFF6B7280),
@@ -281,37 +349,40 @@ class AdminDashboardScreen extends StatelessWidget {
                         
                         // Nearest Responders List
                         Expanded(
-                          child: ListView(
+                          child: ListView.builder(
                             padding: const EdgeInsets.all(24),
-                            children: [
-                              Text(
-                                'NEAREST RESPONDERS',
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  color: cs.onSurface.withOpacity(0.5),
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 1.0,
+                            itemCount: _units.length + 1,
+                            itemBuilder: (context, index) {
+                              if (index == 0) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 16.0),
+                                  child: Text(
+                                    'NEAREST RESPONDERS',
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: cs.onSurface.withOpacity(0.5),
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 1.0,
+                                    ),
+                                  ),
+                                );
+                              }
+                              final unitIndex = index - 1;
+                              final unit = _units[unitIndex];
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 12.0),
+                                child: _UnitCard(
+                                  name: unit['name'],
+                                  distance: unit['distance'],
+                                  eta: unit['eta'],
+                                  isSelected: _selectedUnitIndex == unitIndex,
+                                  onTap: () {
+                                    setState(() {
+                                      _selectedUnitIndex = unitIndex;
+                                    });
+                                  },
                                 ),
-                              ),
-                              const SizedBox(height: 16),
-                              _UnitCard(
-                                name: 'Unit 7A (ALS)',
-                                distance: '0.8 mi',
-                                eta: 'ETA: 3 mins',
-                                isSelected: true,
-                              ),
-                              const SizedBox(height: 12),
-                              _UnitCard(
-                                name: 'Unit 12B (BLS)',
-                                distance: '1.4 mi',
-                                eta: 'ETA: 6 mins',
-                              ),
-                              const SizedBox(height: 12),
-                              _UnitCard(
-                                name: 'Rapid Response 4',
-                                distance: '2.1 mi',
-                                eta: 'ETA: 8 mins',
-                              ),
-                            ],
+                              );
+                            },
                           ),
                         ),
 
@@ -321,7 +392,17 @@ class AdminDashboardScreen extends StatelessWidget {
                           child: MouseRegion(
                             cursor: SystemMouseCursors.click,
                             child: ElevatedButton(
-                              onPressed: () {},
+                              onPressed: () {
+                                final selectedUnit = _units[_selectedUnitIndex]['name'];
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('$selectedUnit dispatched successfully!'),
+                                    backgroundColor: const Color(0xFF10B981),
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                );
+                              },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFFDC2626), // Red
                                 padding: const EdgeInsets.symmetric(vertical: 18),
@@ -335,9 +416,9 @@ class AdminDashboardScreen extends StatelessWidget {
                                 children: [
                                   const Icon(Icons.send_rounded, color: Colors.white, size: 20),
                                   const SizedBox(width: 12),
-                                  const Text(
-                                    'DISPATCH UNIT 7A',
-                                    style: TextStyle(
+                                  Text(
+                                    'DISPATCH ${_units[_selectedUnitIndex]['name'].split(' ')[0]} ${_units[_selectedUnitIndex]['name'].split(' ')[1]}',
+                                    style: const TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.w900,
                                       letterSpacing: 1.0,
@@ -383,6 +464,8 @@ class _IncidentCard extends StatelessWidget {
   final String title;
   final String address;
   final String time;
+  final bool isSelected;
+  final VoidCallback onTap;
 
   const _IncidentCard({
     required this.type,
@@ -390,107 +473,109 @@ class _IncidentCard extends StatelessWidget {
     required this.title,
     required this.address,
     required this.time,
+    required this.isSelected,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final isCritical = type == 'CRITICAL AID';
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: isCritical ? Border.all(color: typeColor, width: 2) : null,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: isSelected ? Border.all(color: typeColor, width: 2) : Border.all(color: Colors.transparent, width: 2),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          type,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: typeColor,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.8,
+                            fontSize: 10,
+                          ),
+                        ),
+                        Text(
+                          time,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: cs.onSurface.withOpacity(0.5),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
                     Text(
-                      type,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: typeColor,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.8,
-                        fontSize: 10,
+                      title,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.headingColor,
                       ),
                     ),
-                    Text(
-                      time,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: cs.onSurface.withOpacity(0.5),
-                        fontWeight: FontWeight.w600,
-                      ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Icon(Icons.location_on, size: 12, color: cs.onSurface.withOpacity(0.5)),
+                        const SizedBox(width: 4),
+                        Text(
+                          address,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: cs.onSurface.withOpacity(0.6),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  title,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.headingColor,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Icon(Icons.location_on, size: 12, color: cs.onSurface.withOpacity(0.5)),
-                    const SizedBox(width: 4),
-                    Text(
-                      address,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: cs.onSurface.withOpacity(0.6),
-                      ),
+              ),
+              // View Details Indicator
+              if (isSelected)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: typeColor.withOpacity(0.1),
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(14),
+                      bottomRight: Radius.circular(14),
                     ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          // View Details Button
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF9FAFB),
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(14),
-                bottomRight: Radius.circular(14),
-              ),
-            ),
-            child: MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: GestureDetector(
-                onTap: () {},
-                child: Text(
-                  'VIEW DETAILS',
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.0,
-                    color: AppTheme.headingColor,
+                  ),
+                  child: Text(
+                    'CURRENTLY VIEWING',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.0,
+                      color: typeColor,
+                    ),
                   ),
                 ),
-              ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -501,12 +586,14 @@ class _UnitCard extends StatelessWidget {
   final String distance;
   final String eta;
   final bool isSelected;
+  final VoidCallback onTap;
 
   const _UnitCard({
     required this.name,
     required this.distance,
     required this.eta,
-    this.isSelected = false,
+    required this.isSelected,
+    required this.onTap,
   });
 
   @override
@@ -514,62 +601,68 @@ class _UnitCard extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isSelected ? const Color(0xFF3B82F6) : cs.onSurface.withOpacity(0.1),
-          width: isSelected ? 2 : 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: isSelected ? const Color(0xFF3B82F6) : const Color(0xFFE5E7EB),
-              borderRadius: BorderRadius.circular(8),
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0xFFEFF6FF) : Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected ? const Color(0xFF3B82F6) : cs.onSurface.withOpacity(0.1),
+              width: isSelected ? 2 : 1,
             ),
-            child: Icon(Icons.directions_car_filled_rounded, 
-                color: isSelected ? Colors.white : const Color(0xFF4B5563), size: 20),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: isSelected ? const Color(0xFF3B82F6) : const Color(0xFFE5E7EB),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.directions_car_filled_rounded, 
+                    color: isSelected ? Colors.white : const Color(0xFF4B5563), size: 20),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      name,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: AppTheme.headingColor,
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          name,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: AppTheme.headingColor,
+                          ),
+                        ),
+                        Text(
+                          distance,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: const Color(0xFF3B82F6),
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
                     ),
+                    const SizedBox(height: 4),
                     Text(
-                      distance,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: const Color(0xFF3B82F6),
-                        fontWeight: FontWeight.w800,
+                      '$eta • Status: Available',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: cs.onSurface.withOpacity(0.6),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  '$eta • Status: Available',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: cs.onSurface.withOpacity(0.6),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

@@ -36,6 +36,61 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
     super.dispose();
   }
 
+  void _showDeleteDataDialog(BuildContext context) {
+    final theme = Theme.of(context);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: AppTheme.surfaceContainerLowest,
+        title: Text(
+          'Delete Report Data',
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w700,
+            color: AppTheme.headingColor,
+          ),
+        ),
+        content: Text(
+          'Are you sure you want to permanently delete all your report data? This action cannot be undone.',
+          style: theme.textTheme.bodyLarge?.copyWith(
+            color: AppTheme.bodyColor.withOpacity(0.6),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              'Cancel',
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: AppTheme.bodyColor.withOpacity(0.6),
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text('Report data deleted successfully'),
+                  backgroundColor: AppTheme.emergencyUrl,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.emergencyUrl,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showSignOutDialog(BuildContext context) {
     final theme = Theme.of(context);
 
@@ -456,7 +511,7 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
                       // Delete Button
                       Center(
                         child: TextButton.icon(
-                          onPressed: () {},
+                          onPressed: () => _showDeleteDataDialog(context),
                           icon: Container(
                             padding: const EdgeInsets.all(4),
                             decoration: BoxDecoration(
