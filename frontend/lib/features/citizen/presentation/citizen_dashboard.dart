@@ -164,8 +164,8 @@ class _CitizenDashboardState extends State<CitizenDashboard> {
                         height: 140,
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(16.0),
-                          color: cs.primary
-                              .withOpacity(0.2), // Map blue placeholder
+                          color: AppTheme.primary
+                              .withOpacity(0.5), // Map blue placeholder
                         ),
                         alignment: Alignment.bottomLeft,
                         padding: const EdgeInsets.all(16.0),

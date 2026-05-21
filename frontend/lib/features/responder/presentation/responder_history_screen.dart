@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/theme.dart';
 import '../../../core/widgets/rapid_aid_logo.dart';
+import 'responder_incident_detail.dart';
 
 class ResponderHistoryScreen extends StatefulWidget {
   const ResponderHistoryScreen({super.key});
@@ -241,7 +242,24 @@ class _ResponderHistoryScreenState extends State<ResponderHistoryScreen> {
                     else
                       ...filtered.map(
                         (incident) => _IncidentCard(
-                            incident: incident, theme: theme, cs: cs),
+                          incident: incident,
+                          theme: theme,
+                          cs: cs,
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => ResponderIncidentDetail(
+                                title: incident.title,
+                                category: incident.category,
+                                address: incident.address,
+                                time: incident.time,
+                                status: incident.status,
+                                icon: incident.icon,
+                                iconBg: incident.iconBg,
+                                iconColor: incident.iconColor,
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
 
                     const SizedBox(height: 12),
@@ -363,115 +381,133 @@ class _IncidentCard extends StatelessWidget {
   final _IncidentRecord incident;
   final ThemeData theme;
   final ColorScheme cs;
+  final VoidCallback onTap;
 
-  const _IncidentCard(
-      {required this.incident, required this.theme, required this.cs});
+  const _IncidentCard({
+    required this.incident,
+    required this.theme,
+    required this.cs,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 3),
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 12,
+                offset: const Offset(0, 3),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Icon badge
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: incident.iconBg,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(incident.icon, color: incident.iconColor, size: 20),
-          ),
-          const SizedBox(width: 14),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Icon badge
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: incident.iconBg,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(incident.icon, color: incident.iconColor, size: 20),
+              ),
+              const SizedBox(width: 14),
 
-          // Content
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Title + Status chip
-                Row(
+              // Content
+              Expanded(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Text(
-                        incident.title,
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.headingColor,
-                          fontSize: 15,
+                    // Title + Status chip
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            incident.title,
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.headingColor,
+                              fontSize: 15,
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF4CAF50).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            incident.status,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: const Color(0xFF2E7D32),
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.5,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF4CAF50).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        incident.status,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: const Color(0xFF2E7D32),
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.5,
-                          fontSize: 10,
+                    const SizedBox(height: 6),
+
+                    // Address
+                    Row(
+                      children: [
+                        Icon(Icons.location_on_rounded,
+                            size: 12, color: cs.onSurface.withOpacity(0.4)),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            incident.address,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: cs.onSurface.withOpacity(0.55),
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                      ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+
+                    // Time + chevron
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          incident.time,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: cs.onSurface.withOpacity(0.4),
+                            fontWeight: FontWeight.w500,
+                            fontSize: 11,
+                          ),
+                        ),
+                        Icon(Icons.chevron_right_rounded,
+                            size: 16, color: cs.onSurface.withOpacity(0.3)),
+                      ],
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
-
-                // Address
-                Row(
-                  children: [
-                    Icon(Icons.location_on_rounded,
-                        size: 12, color: cs.onSurface.withOpacity(0.4)),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        incident.address,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: cs.onSurface.withOpacity(0.55),
-                          fontWeight: FontWeight.w500,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-
-                // Time
-                Text(
-                  incident.time,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: cs.onSurface.withOpacity(0.4),
-                    fontWeight: FontWeight.w500,
-                    fontSize: 11,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

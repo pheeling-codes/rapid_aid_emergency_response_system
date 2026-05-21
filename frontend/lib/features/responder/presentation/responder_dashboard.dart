@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/theme.dart';
 import '../../../core/widgets/rapid_aid_logo.dart';
+import 'critical_incident_popup.dart';
 
 class ResponderDashboard extends StatefulWidget {
   const ResponderDashboard({super.key});
@@ -15,14 +17,28 @@ class _ResponderDashboardState extends State<ResponderDashboard>
   bool _isOnDuty = true;
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
+  Timer? _dispatchTimer;
+  bool _isPopupShowing = false;
 
   // Simulated shift timer state
   int _hours = 4, _minutes = 12, _seconds = 5;
 
   final List<Map<String, String>> _shiftHistory = [
-    {'date': 'Oct 24 Shift', 'range': '08:00 - 18:00 · 10h Total', 'status': 'COMPLETED'},
-    {'date': 'Oct 23 Shift', 'range': '08:00 - 18:15 · 10.25h Total', 'status': 'COMPLETED'},
-    {'date': 'Oct 22 Shift', 'range': '07:45 - 17:30 · 9.75h Total', 'status': 'COMPLETED'},
+    {
+      'date': 'Oct 24 Shift',
+      'range': '08:00 - 18:00 · 10h Total',
+      'status': 'COMPLETED'
+    },
+    {
+      'date': 'Oct 23 Shift',
+      'range': '08:00 - 18:15 · 10.25h Total',
+      'status': 'COMPLETED'
+    },
+    {
+      'date': 'Oct 22 Shift',
+      'range': '07:45 - 17:30 · 9.75h Total',
+      'status': 'COMPLETED'
+    },
   ];
 
   @override
@@ -37,11 +53,29 @@ class _ResponderDashboardState extends State<ResponderDashboard>
       parent: _pulseController,
       curve: Curves.easeInOut,
     ));
+
+    // Schedule the first popup
+    _scheduleDispatchPopup();
+  }
+
+  void _scheduleDispatchPopup() {
+    _dispatchTimer?.cancel();
+    _dispatchTimer = Timer(const Duration(seconds: 10), () {
+      if (!mounted) return;
+      _isPopupShowing = true;
+      CriticalIncidentPopup.show(context).then((_) {
+        if (!mounted) return;
+        setState(() => _isPopupShowing = false);
+        // Start the 10-second countdown again ONLY after the popup is closed
+        _scheduleDispatchPopup();
+      });
+    });
   }
 
   @override
   void dispose() {
     _pulseController.dispose();
+    _dispatchTimer?.cancel();
     super.dispose();
   }
 
@@ -249,8 +283,11 @@ class _DeploymentToggle extends StatelessWidget {
             value: isOnDuty,
             onChanged: onChanged,
             activeColor: cs.primary,
-            thumbColor: WidgetStateProperty.all(Colors.white),
+            // thumbColor: WidgetStateProperty.all(Colors.white),
+            activeThumbColor: Colors.white,
             activeTrackColor: cs.primary,
+            inactiveThumbColor: AppTheme.primary,
+            inactiveTrackColor: const Color(0xFFEEF2F6),
           ),
           const SizedBox(width: 6),
           Text(
@@ -484,8 +521,8 @@ class _MapPreviewCard extends StatelessWidget {
                       height: 80 * pulseAnimation.value,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: cs.primary.withOpacity(
-                            0.12 * (2 - pulseAnimation.value)),
+                        color: cs.primary
+                            .withOpacity(0.12 * (2 - pulseAnimation.value)),
                       ),
                     ),
                     // Pin body (coral/red)
@@ -510,8 +547,7 @@ class _MapPreviewCard extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: cs.primary,
                             shape: BoxShape.circle,
-                            border:
-                                Border.all(color: Colors.white, width: 2),
+                            border: Border.all(color: Colors.white, width: 2),
                           ),
                           child: const Icon(Icons.person_pin,
                               color: Colors.white, size: 14),
@@ -553,13 +589,12 @@ class _MapPreviewCard extends StatelessWidget {
             bottom: 14,
             left: 14,
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                    color: Colors.white.withOpacity(0.2), width: 1),
+                border:
+                    Border.all(color: Colors.white.withOpacity(0.2), width: 1),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,

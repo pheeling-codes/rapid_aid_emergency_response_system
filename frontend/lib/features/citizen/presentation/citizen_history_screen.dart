@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/theme.dart';
 import '../../../core/widgets/rapid_aid_logo.dart';
+import 'citizen_report_detail.dart';
 
 /// Citizen History Screen (Reports)
 class CitizenHistoryScreen extends StatefulWidget {
@@ -260,7 +261,11 @@ class _CitizenHistoryScreenState extends State<CitizenHistoryScreen> {
                         return _ReportCard(
                           report: report,
                           onTap: () {
-                            // Currently no-op or navigate
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => CitizenReportDetail(report: report),
+                              ),
+                            );
                           },
                         );
                       },
@@ -288,115 +293,118 @@ class _ReportCard extends StatelessWidget {
     final cs = theme.colorScheme;
     final color = report['color'] as Color;
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16.0),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16.0),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Icon Container
-            Container(
-              padding: const EdgeInsets.all(12.0),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12.0),
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(16.0),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16.0),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
               ),
-              child: Icon(
-                report['icon'] as IconData,
-                color: color,
-                size: 28,
+            ],
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Icon Container
+              Container(
+                padding: const EdgeInsets.all(12.0),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12.0),
+                ),
+                child: Icon(
+                  report['icon'] as IconData,
+                  color: color,
+                  size: 28,
+                ),
               ),
-            ),
-            const SizedBox(width: 16),
+              const SizedBox(width: 16),
 
-            // Content
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Header Row
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          report['type'] as String,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            color: cs.onSurface,
-                            letterSpacing: -0.3,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      // Status Pill
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: report['statusBg'] as Color,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          report['status'] as String,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: report['statusColor'] as Color,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.5,
+              // Content
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header Row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            report['type'] as String,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color: cs.onSurface,
+                              letterSpacing: -0.3,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-
-                  // Date Time
-                  Text(
-                    report['date'] as String,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: cs.onSurface.withOpacity(0.7),
-                      fontWeight: FontWeight.w600,
+                        const SizedBox(width: 8),
+                        // Status Pill
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: report['statusBg'] as Color,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            report['status'] as String,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: report['statusColor'] as Color,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 8),
+                    const SizedBox(height: 6),
 
-                  // Location
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(Icons.location_on,
-                          size: 14, color: cs.onSurface.withOpacity(0.5)),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          report['address'] as String,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: cs.onSurface.withOpacity(0.6),
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                    // Date Time
+                    Text(
+                      report['date'] as String,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: cs.onSurface.withOpacity(0.7),
+                        fontWeight: FontWeight.w600,
                       ),
-                    ],
-                  ),
-                ],
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Location
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.location_on,
+                            size: 14, color: cs.onSurface.withOpacity(0.5)),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            report['address'] as String,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: cs.onSurface.withOpacity(0.6),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
