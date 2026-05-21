@@ -87,19 +87,19 @@ class _CitizenDashboardState extends State<CitizenDashboard> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 16.0, vertical: 8.0),
                         decoration: BoxDecoration(
-                          color: Colors.green.withOpacity(0.08),
+                          color: Colors.blue.withOpacity(0.08),
                           borderRadius: BorderRadius.circular(24.0),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(Icons.location_on,
-                                size: 14, color: Colors.green.shade700),
+                                size: 14, color: Colors.blue.shade700),
                             const SizedBox(width: 8),
                             Text(
                               'LOCATION SERVICE: ACTIVE',
                               style: theme.textTheme.labelSmall?.copyWith(
-                                color: Colors.green.shade700,
+                                color: Colors.blue.shade700,
                                 fontWeight: FontWeight.w800,
                                 letterSpacing: 0.8,
                               ),

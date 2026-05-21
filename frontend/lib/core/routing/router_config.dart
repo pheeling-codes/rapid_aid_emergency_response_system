@@ -30,6 +30,11 @@ import '../../features/responder/presentation/responder_active_emergencies.dart'
 import '../../features/responder/presentation/responder_history_screen.dart';
 import '../../features/responder/presentation/responder_map_screen.dart';
 import '../../features/responder/presentation/responder_profile_screen.dart';
+import '../../features/admin/presentation/admin_shell.dart';
+import '../../features/admin/presentation/admin_dashboard_screen.dart';
+import '../../features/admin/presentation/admin_units_screen.dart';
+import '../../features/admin/presentation/admin_incidents_screen.dart';
+import '../../features/admin/presentation/admin_settings_screen.dart';
 
 /// GoRouter configuration with RBAC navigation guards.
 ///
@@ -214,13 +219,31 @@ class AppRouter {
         builder: (context, state) => const ResponderActiveEmergencies(),
       ),
 
-      // ── Stage 4c: Admin Placeholder ──
-      GoRoute(
-        path: '/admin',
-        builder: (context, state) => _DashboardPlaceholder(
-          title: 'Admin Command Center',
-          role: UserRole.admin,
-        ),
+      // ── Stage 4c: Admin Shell ──
+      ShellRoute(
+        builder: (context, state, child) => AdminShell(child: child),
+        routes: [
+          GoRoute(
+            path: '/admin',
+            redirect: (context, state) => '/admin/dashboard',
+          ),
+          GoRoute(
+            path: '/admin/dashboard',
+            builder: (context, state) => const AdminDashboardScreen(),
+          ),
+          GoRoute(
+            path: '/admin/units',
+            builder: (context, state) => const AdminUnitsScreen(),
+          ),
+          GoRoute(
+            path: '/admin/incidents',
+            builder: (context, state) => const AdminIncidentsScreen(),
+          ),
+          GoRoute(
+            path: '/admin/settings',
+            builder: (context, state) => const AdminSettingsScreen(),
+          ),
+        ],
       ),
 
       // Legacy redirect
