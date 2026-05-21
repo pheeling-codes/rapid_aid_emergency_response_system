@@ -24,6 +24,12 @@ import '../../features/citizen/presentation/confirm_dispatch.dart';
 import '../../features/citizen/presentation/citizen_map_screen.dart';
 import '../../features/citizen/presentation/citizen_history_screen.dart';
 import '../../features/citizen/presentation/citizen_profile_screen.dart';
+import '../../features/responder/presentation/responder_shell.dart';
+import '../../features/responder/presentation/responder_dashboard.dart';
+import '../../features/responder/presentation/responder_active_emergencies.dart';
+import '../../features/responder/presentation/responder_history_screen.dart';
+import '../../features/responder/presentation/responder_map_screen.dart';
+import '../../features/responder/presentation/responder_profile_screen.dart';
 
 /// GoRouter configuration with RBAC navigation guards.
 ///
@@ -175,14 +181,40 @@ class AppRouter {
         },
       ),
 
-      // ── Stage 4b: Responder & Admin Placeholders ──
-      GoRoute(
-        path: '/responder',
-        builder: (context, state) => _DashboardPlaceholder(
-          title: 'Responder Dashboard',
-          role: UserRole.responder,
-        ),
+      // ── Stage 4b: Responder Shell ──
+      ShellRoute(
+        builder: (context, state, child) => ResponderShell(child: child),
+        routes: [
+          GoRoute(
+            path: '/responder',
+            redirect: (context, state) => '/responder/dashboard',
+          ),
+          GoRoute(
+            path: '/responder/dashboard',
+            builder: (context, state) => const ResponderDashboard(),
+          ),
+          GoRoute(
+            path: '/responder/history',
+            builder: (context, state) => const ResponderHistoryScreen(),
+          ),
+          GoRoute(
+            path: '/responder/map',
+            builder: (context, state) => const ResponderMapScreen(),
+          ),
+          GoRoute(
+            path: '/responder/profile',
+            builder: (context, state) => const ResponderProfileScreen(),
+          ),
+        ],
       ),
+
+      // ── Responder Full-Screen Routes (outside shell) ──
+      GoRoute(
+        path: '/responder/active-emergencies',
+        builder: (context, state) => const ResponderActiveEmergencies(),
+      ),
+
+      // ── Stage 4c: Admin Placeholder ──
       GoRoute(
         path: '/admin',
         builder: (context, state) => _DashboardPlaceholder(
@@ -317,6 +349,45 @@ class _DashboardPlaceholder extends StatelessWidget {
               },
               icon: const Icon(Icons.logout_outlined, size: 18),
               label: const Text('Sign Out'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Placeholder for responder tabs that are not yet built.
+class _ComingSoon extends StatelessWidget {
+  final String label;
+  const _ComingSoon({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    return Scaffold(
+      backgroundColor: cs.surface,
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.construction_rounded,
+                size: 48, color: cs.primary.withOpacity(0.4)),
+            const SizedBox(height: 16),
+            Text(
+              label,
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: cs.onSurface.withOpacity(0.6),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Coming Soon',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: cs.onSurface.withOpacity(0.4),
+              ),
             ),
           ],
         ),
