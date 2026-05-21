@@ -62,6 +62,13 @@ class _ResponderDashboardState extends State<ResponderDashboard>
     _dispatchTimer?.cancel();
     _dispatchTimer = Timer(const Duration(seconds: 10), () {
       if (!mounted) return;
+      
+      // Don't show the popup if we've navigated to a sub-page (like Active Emergencies)
+      if (ModalRoute.of(context)?.isCurrent != true) {
+        _scheduleDispatchPopup();
+        return;
+      }
+      
       _isPopupShowing = true;
       CriticalIncidentPopup.show(context).then((_) {
         if (!mounted) return;
@@ -185,8 +192,11 @@ class _ResponderDashboardState extends State<ResponderDashboard>
 
                     // Emergency Assist CTA
                     _EmergencyAssistButton(
-                      onTap: () =>
-                          context.push('/responder/active-emergencies'),
+                      onTap: () async {
+                        _dispatchTimer?.cancel();
+                        await context.push('/responder/active-emergencies');
+                        if (mounted) _scheduleDispatchPopup();
+                      },
                       theme: theme,
                     ),
                     const SizedBox(height: 28),

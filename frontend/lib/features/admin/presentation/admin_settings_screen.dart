@@ -5,6 +5,9 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:html' as html;
 
 import '../../../core/theme/theme.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../auth/logic/auth_bloc.dart';
+import '../../auth/logic/auth_event.dart';
 
 class AdminSettingsScreen extends StatefulWidget {
   const AdminSettingsScreen({super.key});
@@ -38,6 +41,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
+              context.read<AuthBloc>().add(const AuthLogoutRequested());
               context.go('/login');
             },
             style: ElevatedButton.styleFrom(
