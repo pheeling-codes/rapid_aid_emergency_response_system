@@ -262,7 +262,7 @@ class CitizenReportDetail extends StatelessWidget {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            'Incident reported via the RapidAid mobile application. Emergency services were requested at the specified location.',
+                            report['description'] as String,
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: AppTheme.headingColor,
                               fontWeight: FontWeight.w500,

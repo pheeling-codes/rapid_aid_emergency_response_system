@@ -3,7 +3,14 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/theme.dart';
 import '../../../core/widgets/rapid_aid_logo.dart';
+import '../../../core/widgets/user_profile_avatar.dart';
+import '../../../main.dart';
+import '../../../features/auth/data/token_storage.dart';
 import 'citizen_report_detail.dart';
+
+import '../../../main.dart';
+import '../../../core/network/network_client.dart';
+import '../../../core/widgets/premium_empty_state.dart';
 
 /// Citizen History Screen (Reports)
 class CitizenHistoryScreen extends StatefulWidget {
@@ -15,82 +22,102 @@ class CitizenHistoryScreen extends StatefulWidget {
 
 class _CitizenHistoryScreenState extends State<CitizenHistoryScreen> {
   String _selectedFilter = 'All';
+  List<Map<String, dynamic>> _reports = [];
+  bool _isLoading = true;
+  String _errorMessage = '';
+  String _userName = '';
+  String _userRole = '';
 
-  // Extended mock data to make it scrollable
-  final List<Map<String, dynamic>> _reports = [
-    {
-      'id': 'RA-992-01',
-      'type': 'Medical Emergency',
-      'category': 'Medical',
-      'icon': Icons.medical_services,
-      'color': AppTheme.emergencyUrl,
-      'date': 'Oct 24, 2023 • 14:02',
-      'status': 'RESOLVED',
-      'statusColor': Colors.green.shade700,
-      'statusBg': Colors.green.shade50,
-      'address': '123 Third Mainland Bridge, Lagos',
-    },
-    {
-      'id': 'RA-988-02',
-      'type': 'Road Accident',
-      'category': 'Accident',
-      'icon': Icons.car_crash,
-      'color': const Color(0xFF1E3A8A), // Deep Blue
-      'date': 'Oct 21, 2023 • 09:15',
-      'status': 'RESOLVED',
-      'statusColor': Colors.green.shade700,
-      'statusBg': Colors.green.shade50,
-      'address': 'Ikeja City Mall, Obafemi Awolowo Way',
-    },
-    {
-      'id': 'RA-991-03',
-      'type': 'Fire Outbreak',
-      'category': 'Fire',
-      'icon': Icons.local_fire_department,
-      'color': const Color(0xFFEA580C), // Orange
-      'date': 'Oct 18, 2023 • 23:45',
-      'status': 'CANCELLED',
-      'statusColor': Colors.grey.shade700,
-      'statusBg': Colors.grey.shade200,
-      'address': 'Block 4, 1004 Estate, Victoria Island',
-    },
-    {
-      'id': 'RA-975-04',
-      'type': 'Security Concern',
-      'category': 'Security',
-      'icon': Icons.security,
-      'color': const Color(0xFF7E22CE), // Purple
-      'date': 'Oct 12, 2023 • 18:20',
-      'status': 'RESOLVED',
-      'statusColor': Colors.green.shade700,
-      'statusBg': Colors.green.shade50,
-      'address': 'Lekki Phase 1, Admiralty Way',
-    },
-    {
-      'id': 'RA-960-05',
-      'type': 'Medical Emergency',
-      'category': 'Medical',
-      'icon': Icons.medical_services,
-      'color': AppTheme.emergencyUrl,
-      'date': 'Sep 30, 2023 • 10:15',
-      'status': 'RESOLVED',
-      'statusColor': Colors.green.shade700,
-      'statusBg': Colors.green.shade50,
-      'address': 'Yaba College of Technology',
-    },
-    {
-      'id': 'RA-955-06',
-      'type': 'Road Accident',
-      'category': 'Accident',
-      'icon': Icons.car_crash,
-      'color': const Color(0xFF1E3A8A),
-      'date': 'Sep 25, 2023 • 16:40',
-      'status': 'CANCELLED',
-      'statusColor': Colors.grey.shade700,
-      'statusBg': Colors.grey.shade200,
-      'address': 'Berger Bus Stop, Lagos',
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    final ts = getIt<TokenStorage>();
+    final email = ts.getUserEmail() ?? 'Citizen';
+    _userRole = ts.getUserRole() ?? 'CITIZEN';
+    _userName = ts.getUserName() ?? email.split('@').first;
+    _fetchHistory();
+  }
+
+  Future<void> _fetchHistory() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+    });
+    try {
+      final dio = getIt<NetworkClient>().dio;
+      final response = await dio.get('/incidents/');
+      final data = response.data as List<dynamic>;
+      
+      setState(() {
+        _reports = data.map((json) {
+          final type = json['category'] ?? 'OTHER';
+          return {
+            'id': json['id'] ?? '',
+            'type': 'Emergency: $type',
+            'category': _capitalize(type),
+            'icon': _getCategoryIcon(type),
+            'color': _getCategoryColor(type),
+            'date': _formatDate(json['created_at']),
+            'status': json['status'] ?? 'PENDING',
+            'statusColor': _getStatusColor(json['status']),
+            'statusBg': _getStatusBg(json['status']),
+            'address': (json['address'] != null && json['address'].toString().isNotEmpty) ? json['address'] : 'Unknown Location',
+            'description': json['description'] ?? 'No description provided.',
+          };
+        }).toList();
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Failed to load history.';
+      });
+    }
+  }
+
+  String _capitalize(String s) => s.isNotEmpty ? s[0].toUpperCase() + s.substring(1).toLowerCase() : '';
+
+  IconData _getCategoryIcon(String type) {
+    switch (type.toLowerCase()) {
+      case 'medical': return Icons.medical_services;
+      case 'fire': return Icons.local_fire_department;
+      case 'accident': return Icons.car_crash;
+      case 'security': return Icons.security;
+      default: return Icons.emergency;
+    }
+  }
+
+  Color _getCategoryColor(String type) {
+    switch (type.toLowerCase()) {
+      case 'medical': return AppTheme.emergencyUrl;
+      case 'fire': return const Color(0xFFEA580C);
+      case 'accident': return const Color(0xFF1E3A8A);
+      case 'security': return const Color(0xFF7E22CE);
+      default: return Colors.grey.shade700;
+    }
+  }
+
+  Color _getStatusColor(String? status) {
+    if (status == 'RESOLVED') return Colors.green.shade700;
+    if (status == 'CANCELLED') return Colors.grey.shade700;
+    return Colors.orange.shade700;
+  }
+
+  Color _getStatusBg(String? status) {
+    if (status == 'RESOLVED') return Colors.green.shade50;
+    if (status == 'CANCELLED') return Colors.grey.shade200;
+    return Colors.orange.shade50;
+  }
+
+  String _formatDate(String? dateStr) {
+    if (dateStr == null) return '';
+    try {
+      final date = DateTime.parse(dateStr).toLocal();
+      return '${date.day}/${date.month}/${date.year} • ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return '';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -123,18 +150,37 @@ class _CitizenHistoryScreenState extends State<CitizenHistoryScreen> {
                       letterSpacing: 0.5,
                     ),
                   ),
-                  Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border:
-                          Border.all(color: cs.surfaceContainerHigh, width: 2),
-                    ),
-                    child: CircleAvatar(
-                      radius: 16,
-                      backgroundColor: cs.surfaceContainerLow,
-                      child: Icon(Icons.person,
-                          color: cs.onSurface.withOpacity(0.7), size: 20),
-                    ),
+                  Row(
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            _userName,
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          Text(
+                            _userRole,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: cs.primary,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border:
+                              Border.all(color: cs.surfaceContainerHigh, width: 2),
+                        ),
+                        child: const UserProfileAvatar(radius: 16),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -217,59 +263,69 @@ class _CitizenHistoryScreenState extends State<CitizenHistoryScreen> {
 
             // Scrollable List
             Expanded(
-              child: filteredReports.isEmpty
-                  ? Center(
-                      child: Text(
-                        'No reports found.',
-                        style: theme.textTheme.bodyLarge
-                            ?.copyWith(color: cs.onSurface.withOpacity(0.5)),
-                      ),
+              child: _isLoading 
+                ? const Center(child: CircularProgressIndicator())
+                : _errorMessage.isNotEmpty
+                  ? PremiumEmptyState(
+                      icon: Icons.error_outline,
+                      title: 'Failed to Load History',
+                      message: _errorMessage,
+                      actionLabel: 'Try Again',
+                      onAction: _fetchHistory,
                     )
-                  : ListView.separated(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 24.0, vertical: 8.0),
-                      itemCount:
-                          filteredReports.length + 1, // +1 for end indicator
-                      separatorBuilder: (context, index) =>
-                          const SizedBox(height: 16),
-                      itemBuilder: (context, index) {
-                        if (index == filteredReports.length) {
-                          // End of report history indicator
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 32.0),
-                            child: Column(
-                              children: [
-                                Divider(color: cs.onSurface.withOpacity(0.1)),
-                                const SizedBox(height: 32),
-                                Icon(Icons.access_time,
-                                    size: 48,
-                                    color: cs.onSurface.withOpacity(0.3)),
-                                const SizedBox(height: 16),
-                                Text(
-                                  'End of report history',
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: cs.onSurface.withOpacity(0.5),
+                  : filteredReports.isEmpty
+                    ? PremiumEmptyState(
+                        icon: Icons.history,
+                        title: 'No Report History',
+                        message: 'You have not reported any incidents yet. Emergencies you report will appear here.',
+                        actionLabel: 'Refresh',
+                        onAction: _fetchHistory,
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 24.0, vertical: 8.0),
+                        itemCount:
+                            filteredReports.length + 1, // +1 for end indicator
+                        separatorBuilder: (context, index) =>
+                            const SizedBox(height: 16),
+                        itemBuilder: (context, index) {
+                          if (index == filteredReports.length) {
+                            // End of report history indicator
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 32.0),
+                              child: Column(
+                                children: [
+                                  Divider(color: cs.onSurface.withOpacity(0.1)),
+                                  const SizedBox(height: 32),
+                                  Icon(Icons.access_time,
+                                      size: 48,
+                                      color: cs.onSurface.withOpacity(0.3)),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'End of report history',
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      color: cs.onSurface.withOpacity(0.5),
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 48), // Bottom padding
-                              ],
-                            ),
-                          );
-                        }
-
-                        final report = filteredReports[index];
-                        return _ReportCard(
-                          report: report,
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => CitizenReportDetail(report: report),
+                                  const SizedBox(height: 48), // Bottom padding
+                                ],
                               ),
                             );
-                          },
-                        );
-                      },
-                    ),
+                          }
+
+                          final report = filteredReports[index];
+                          return _ReportCard(
+                            report: report,
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => CitizenReportDetail(report: report),
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      ),
             ),
           ],
         ),

@@ -6,9 +6,14 @@ import '../../../core/theme/theme.dart';
 import '../../../core/widgets/rapid_aid_logo.dart';
 import '../../auth/logic/auth_bloc.dart';
 import '../../auth/logic/auth_event.dart';
+import '../../../main.dart';
+import '../../../core/network/network_client.dart';
+import '../../auth/data/token_storage.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
+import 'dart:convert';
 
 /// Citizen Profile Screen
 /// High-end profile screen with futuristic UI elements matching the Vanguard aesthetic.
@@ -20,18 +25,129 @@ class CitizenProfileScreen extends StatefulWidget {
 }
 
 class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
-  final _nameController = TextEditingController(text: 'Alex Henderson');
-  final _phoneController = TextEditingController(text: '+1 (555) 123-4567');
-  final _emailController = TextEditingController(text: 'alex.h@rapidaid.org');
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
 
   bool _isDarkTheme = false;
   bool _isLocationEnabled = true;
   String? _profileImageUrl;
+  bool _isLoading = true;
+  bool _isSaving = false;
+  int _totalReports = 0;
+
+  String? _profileImageBase64;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfileSync();
+    _fetchProfileData();
+  }
+
+  void _loadProfileSync() {
+    final ts = getIt<TokenStorage>();
+    final name = ts.getUserName();
+    final email = ts.getUserEmail();
+    final img = ts.getProfileImage();
+    if (name != null && name.isNotEmpty) {
+      _nameController.text = name;
+    }
+    if (email != null && email.isNotEmpty) {
+      _emailController.text = email;
+    }
+    if (img != null && img.isNotEmpty) {
+      _profileImageBase64 = img;
+    }
+  }
+
+  Future<void> _fetchProfileData() async {
+    // Only fetch for total reports or updates, no need to show loading if we have local data
+    if (_nameController.text.isNotEmpty) {
+      setState(() => _isLoading = false);
+    }
+    try {
+      final client = getIt<NetworkClient>().dio;
+      final profileRes = await client.get('/auth/me/');
+      if (profileRes.data != null) {
+        final data = profileRes.data;
+        final fetchedName = "${data['first_name'] ?? ''} ${data['last_name'] ?? ''}".trim();
+        if (fetchedName.isNotEmpty) {
+           _nameController.text = fetchedName;
+           getIt<TokenStorage>().saveUserName(fetchedName);
+        } else if (data['username'] != null) {
+           _nameController.text = data['username'];
+           getIt<TokenStorage>().saveUserName(data['username']);
+        }
+        if (data['email'] != null) {
+           _emailController.text = data['email'];
+        }
+        if (data['profile_image'] != null && data['profile_image'].toString().isNotEmpty) {
+           _profileImageBase64 = data['profile_image'];
+           getIt<TokenStorage>().saveProfileImage(data['profile_image']);
+        }
+      }
+      
+      final reportsRes = await client.get('/incidents/');
+      if (reportsRes.data != null && reportsRes.data is List) {
+        _totalReports = (reportsRes.data as List).length;
+      }
+    } catch (e) {
+      debugPrint("Profile fetch error: $e");
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _updateProfile() async {
+    if (_nameController.text.isEmpty) return;
+    setState(() => _isSaving = true);
+    try {
+      final client = getIt<NetworkClient>().dio;
+      final parts = _nameController.text.trim().split(' ');
+      final firstName = parts.isNotEmpty ? parts.first : '';
+      final lastName = parts.length > 1 ? parts.sublist(1).join(' ') : '';
+      
+      await client.patch('/auth/me/', data: {
+        'first_name': firstName,
+        'last_name': lastName,
+        if (_profileImageBase64 != null) 'profile_image': _profileImageBase64,
+      });
+      
+      // Update local storage so Dashboards show the new name
+      final ts = getIt<TokenStorage>();
+      await ts.saveUserName(_nameController.text.trim());
+      if (_profileImageBase64 != null) {
+        await ts.saveProfileImage(_profileImageBase64!);
+      }
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Profile saved successfully'),
+            backgroundColor: const Color(0xFF004F9F),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to update profile'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
 
   @override
   void dispose() {
     _nameController.dispose();
-    _phoneController.dispose();
     _emailController.dispose();
     super.dispose();
   }
@@ -196,13 +312,15 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
                               input.onChange.listen((e) {
                                 final files = input.files;
                                 if (files != null && files.isNotEmpty) {
-                                  final objectUrl =
-                                      html.Url.createObjectUrlFromBlob(files[0]);
-                                  if (context.mounted) {
-                                    setState(() {
-                                      _profileImageUrl = objectUrl;
-                                    });
-                                  }
+                                  final reader = html.FileReader();
+                                  reader.readAsDataUrl(files[0]);
+                                  reader.onLoadEnd.listen((_) {
+                                    if (context.mounted) {
+                                      setState(() {
+                                        _profileImageBase64 = reader.result as String;
+                                      });
+                                    }
+                                  });
                                 }
                               });
                             }
@@ -227,16 +345,14 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
                                   ],
                                 ),
                                 child: ClipOval(
-                                  child: _profileImageUrl != null
-                                      ? Image.network(
-                                          _profileImageUrl!,
+                                  child: _profileImageBase64 != null
+                                      ? Image.memory(
+                                          base64Decode(_profileImageBase64!.split(',').last),
                                           fit: BoxFit.cover,
-                                          width: 120,
-                                          height: 120,
                                         )
                                       : Icon(Icons.person,
-                                          size: 70,
-                                          color: cs.onSurface.withOpacity(0.4)),
+                                          size: 56,
+                                          color: cs.onSurface.withOpacity(0.3)),
                                 ),
                               ),
                               Container(
@@ -258,21 +374,22 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
                       const SizedBox(height: 40),
 
                       // Text Fields
-                      _ProfileTextField(
-                        label: 'Full Name',
-                        controller: _nameController,
-                      ),
-                      const SizedBox(height: 20),
-                      _ProfileTextField(
-                        label: 'Phone Number',
-                        controller: _phoneController,
-                      ),
-                      const SizedBox(height: 20),
-                      _ProfileTextField(
-                        label: 'Email Address',
-                        controller: _emailController,
-                        enabled: false,
-                      ),
+                      _isLoading
+                          ? const Center(child: CircularProgressIndicator())
+                          : Column(
+                              children: [
+                                _ProfileTextField(
+                                  label: 'Full Name',
+                                  controller: _nameController,
+                                ),
+                                const SizedBox(height: 20),
+                                _ProfileTextField(
+                                  label: 'Email Address',
+                                  controller: _emailController,
+                                  enabled: false,
+                                ),
+                              ],
+                            ),
                       const SizedBox(height: 24),
 
                       // Save Changes Button
@@ -280,19 +397,7 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
                         width: double.infinity,
                         height: 50,
                         child: ElevatedButton(
-                          onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content:
-                                    const Text('Profile saved successfully'),
-                                backgroundColor: const Color(0xFF004F9F),
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                            );
-                          },
+                          onPressed: _isLoading || _isSaving ? null : _updateProfile,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF004F9F),
                             shape: RoundedRectangleBorder(
@@ -300,13 +405,19 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
                             ),
                             elevation: 0,
                           ),
-                          child: Text(
-                            'Save Changes',
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
+                          child: _isSaving
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                      color: Colors.white, strokeWidth: 2))
+                              : Text(
+                                  'Save Changes',
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
                         ),
                       ),
                       const SizedBox(height: 32),
@@ -357,16 +468,18 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
                                         AppTheme.emergencyUrl.withOpacity(0.2),
                                     shape: BoxShape.circle,
                                   ),
-                                  child: Center(
-                                    child: Text(
-                                      '12',
-                                      style: theme.textTheme.headlineSmall
-                                          ?.copyWith(
-                                        color: AppTheme.emergencyUrl,
-                                        fontWeight: FontWeight.w900,
-                                      ),
+                                    child: Center(
+                                      child: _isLoading 
+                                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator())
+                                        : Text(
+                                            '$_totalReports',
+                                            style: theme.textTheme.headlineSmall
+                                                ?.copyWith(
+                                              color: AppTheme.emergencyUrl,
+                                              fontWeight: FontWeight.w900,
+                                            ),
+                                          ),
                                     ),
-                                  ),
                                 ),
                               ],
                             ),

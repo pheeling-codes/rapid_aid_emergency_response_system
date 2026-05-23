@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../widgets/rapid_aid_logo.dart';
 
@@ -182,7 +183,17 @@ class AppRouter {
           final extra = state.extra as Map<String, dynamic>? ?? {};
           final type = extra['type'] as String? ?? 'Medical';
           final desc = extra['description'] as String? ?? '';
-          return ConfirmDispatch(emergencyType: type, description: desc);
+          final lat = extra['latitude'] as double?;
+          final lng = extra['longitude'] as double?;
+          final mediaFiles = extra['mediaFiles'] as List<dynamic>?;
+          // Cast dynamic list to List<XFile>
+          return ConfirmDispatch(
+            emergencyType: type, 
+            description: desc,
+            latitude: lat,
+            longitude: lng,
+            mediaFiles: mediaFiles?.cast(),
+          );
         },
       ),
 

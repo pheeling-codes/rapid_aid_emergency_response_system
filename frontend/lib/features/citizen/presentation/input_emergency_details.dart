@@ -6,6 +6,9 @@ import '../../../core/widgets/ambient_shadow.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
+import 'package:geolocator/geolocator.dart';
+import 'package:image_picker/image_picker.dart';
+import '../services/location_service.dart';
 
 class InputEmergencyDetails extends StatefulWidget {
   final String emergencyType;
@@ -24,8 +27,11 @@ class _InputEmergencyDetailsState extends State<InputEmergencyDetails> {
   final FocusNode _focusNode = FocusNode();
   bool _isFocused = false;
   String _errorMessage = '';
-  String? _evidenceImageUrl;
-  String? _evidenceFileName;
+
+  final ImagePicker _picker = ImagePicker();
+  List<XFile> _evidenceFiles = [];
+  int _totalEvidenceSizeInBytes = 0;
+  bool _isLocating = false;
 
   @override
   void initState() {
@@ -59,27 +65,110 @@ class _InputEmergencyDetailsState extends State<InputEmergencyDetails> {
     }
   }
 
-  void _validateAndProceed() {
+  void _showErrorToast(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        backgroundColor: const Color(0xFFDC2626), // Emergency Red
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        content: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Colors.white),
+            const SizedBox(width: 8),
+            Expanded(
+                child: Text(msg,
+                    style: const TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.w600))),
+          ],
+        )));
+  }
+
+  Future<void> _pickMedia() async {
+    if (_evidenceFiles.length >= 4) {
+      _showErrorToast('Maximum of 4 evidence files allowed.');
+      return;
+    }
+
+    try {
+      final List<XFile> selected = await _picker.pickMultiImage();
+      if (selected.isEmpty) return;
+
+      List<XFile> validFiles = [];
+      for (var file in selected) {
+        final length = await file.length();
+        if (length > 5 * 1024 * 1024) {
+          // 5MB
+          _showErrorToast('File ${file.name} exceeds 5MB limit.');
+          continue;
+        }
+        validFiles.add(file);
+      }
+
+      int slotsAvailable = 4 - _evidenceFiles.length;
+      List<XFile> validFilesToTake = validFiles.take(slotsAvailable).toList();
+
+      int additionalSize = 0;
+      for (var f in validFilesToTake) {
+        additionalSize += await f.length();
+      }
+
+      setState(() {
+        if (_evidenceFiles.length + validFiles.length > 4) {
+          _showErrorToast('Maximum of 4 evidence files allowed.');
+        }
+        _evidenceFiles.addAll(validFilesToTake);
+        _totalEvidenceSizeInBytes += additionalSize;
+      });
+    } catch (e) {
+      _showErrorToast('Failed to pick media: $e');
+    }
+  }
+
+  void _removeFile(XFile file) async {
+    final length = await file.length();
+    setState(() {
+      _evidenceFiles.remove(file);
+      _totalEvidenceSizeInBytes -= length;
+    });
+  }
+
+  Future<void> _validateAndProceed() async {
     final text = _descriptionController.text.trim();
     if (text.isEmpty) {
-      setState(() {
-        _errorMessage = 'Please provide a brief situation description.';
-      });
+      setState(() =>
+          _errorMessage = 'Please provide a brief situation description.');
       return;
     }
     if (text.length < 10) {
-      setState(() {
-        _errorMessage = 'Please provide more details (at least 10 characters).';
-      });
+      setState(() => _errorMessage =
+          'Please provide more details (at least 10 characters).');
       return;
     }
-    setState(() {
-      _errorMessage = '';
-    });
-    context.push('/citizen/dispatch-confirm', extra: {
-      'type': widget.emergencyType,
-      'description': text,
-    });
+    setState(() => _errorMessage = '');
+
+    setState(() => _isLocating = true);
+
+    try {
+      Position? position = await LocationService().getCurrentPosition();
+      if (position == null) {
+        throw Exception('Could not determine current location.');
+      }
+
+      if (mounted) {
+        setState(() => _isLocating = false);
+        context.push('/citizen/dispatch-confirm', extra: {
+          'type': widget.emergencyType,
+          'description': text,
+          'latitude': position.latitude,
+          'longitude': position.longitude,
+          'mediaFiles': _evidenceFiles,
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLocating = false);
+        _showErrorToast('Failed to get location: $e');
+      }
+    }
   }
 
   @override
@@ -92,7 +181,6 @@ class _InputEmergencyDetailsState extends State<InputEmergencyDetails> {
       body: SafeArea(
         child: Column(
           children: [
-            // Fixed Custom Topbar
             Padding(
               padding:
                   const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
@@ -109,7 +197,7 @@ class _InputEmergencyDetailsState extends State<InputEmergencyDetails> {
                   Text(
                     'Incident Details',
                     style: theme.textTheme.titleMedium?.copyWith(
-                      color: cs.onSurface,
+                      color: AppTheme.primary,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 0.5,
                     ),
@@ -131,7 +219,6 @@ class _InputEmergencyDetailsState extends State<InputEmergencyDetails> {
               ),
             ),
 
-            // Scrollable Content
             Expanded(
               child: SingleChildScrollView(
                 padding:
@@ -139,7 +226,6 @@ class _InputEmergencyDetailsState extends State<InputEmergencyDetails> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Header
                     Text(
                       'Incident Details',
                       style: theme.textTheme.headlineMedium?.copyWith(
@@ -158,7 +244,6 @@ class _InputEmergencyDetailsState extends State<InputEmergencyDetails> {
                     ),
                     const SizedBox(height: 32),
 
-                    // Category Card Prefilled
                     Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16.0, vertical: 12.0),
@@ -222,7 +307,6 @@ class _InputEmergencyDetailsState extends State<InputEmergencyDetails> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Description Input Box
                     Container(
                       decoration: BoxDecoration(
                         color: cs.surfaceContainerLow,
@@ -261,7 +345,7 @@ class _InputEmergencyDetailsState extends State<InputEmergencyDetails> {
                               focusedBorder: InputBorder.none,
                               contentPadding: const EdgeInsets.all(16.0),
                               counterText:
-                                  '', // We hide default counter to build custom one
+                                  '', 
                             ),
                           ),
                           Padding(
@@ -312,16 +396,15 @@ class _InputEmergencyDetailsState extends State<InputEmergencyDetails> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Evidence Upload Box (Dashed style via custom painter or simple container)
                     MouseRegion(
                       cursor: SystemMouseCursors.click,
                       child: CustomPaint(
                         painter: _DashedRectPainter(
-                            color: _evidenceImageUrl != null
+                            color: _evidenceFiles.isNotEmpty
                                 ? Colors.transparent
                                 : cs.onSurface.withOpacity(0.15)),
                         child: Container(
-                          height: 160,
+                          constraints: const BoxConstraints(minHeight: 160),
                           width: double.infinity,
                           decoration: BoxDecoration(
                             color: cs.surfaceContainerLowest,
@@ -331,68 +414,91 @@ class _InputEmergencyDetailsState extends State<InputEmergencyDetails> {
                             color: Colors.transparent,
                             child: InkWell(
                               borderRadius: BorderRadius.circular(12.0),
-                              onTap: () {
-                                if (kIsWeb) {
-                                  final input = html.FileUploadInputElement()
-                                    ..accept = 'image/*,video/*'
-                                    ..click();
-                                  input.onChange.listen((e) {
-                                    final files = input.files;
-                                    if (files != null && files.isNotEmpty) {
-                                      final objectUrl = html.Url
-                                          .createObjectUrlFromBlob(files[0]);
-                                      if (context.mounted) {
-                                        setState(() {
-                                          _evidenceImageUrl = objectUrl;
-                                          _evidenceFileName = files[0].name;
-                                        });
-                                      }
-                                    }
-                                  });
-                                }
-                              },
-                              child: _evidenceImageUrl != null
-                                  ? ClipRRect(
-                                      borderRadius: BorderRadius.circular(12.0),
-                                      child: Stack(
-                                        fit: StackFit.expand,
+                              onTap: _pickMedia,
+                              child: _evidenceFiles.isNotEmpty
+                                  ? Padding(
+                                      padding: const EdgeInsets.all(12),
+                                      child: Column(
                                         children: [
-                                          Image.network(
-                                            _evidenceImageUrl!,
-                                            fit: BoxFit.cover,
-                                          ),
-                                          // Overlay with filename + tap to change
-                                          Positioned(
-                                            bottom: 0,
-                                            left: 0,
-                                            right: 0,
-                                            child: Container(
-                                              padding: const EdgeInsets.symmetric(
-                                                  horizontal: 12, vertical: 8),
-                                              color: Colors.black54,
-                                              child: Row(
-                                                children: [
-                                                  const Icon(Icons.image,
-                                                      color: Colors.white,
-                                                      size: 16),
-                                                  const SizedBox(width: 8),
-                                                  Expanded(
-                                                    child: Text(
-                                                      _evidenceFileName ?? '',
-                                                      style: const TextStyle(
-                                                          color: Colors.white,
-                                                          fontSize: 12),
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
+                                          Wrap(
+                                            spacing: 8,
+                                            runSpacing: 8,
+                                            children: [
+                                              ..._evidenceFiles.map((file) {
+                                                return Stack(
+                                                  clipBehavior: Clip.none,
+                                                  children: [
+                                                    Container(
+                                                      width: 80,
+                                                      height: 80,
+                                                      decoration: BoxDecoration(
+                                                        borderRadius:
+                                                            BorderRadius.circular(8),
+                                                        color: Colors.black12,
+                                                      ),
+                                                      clipBehavior: Clip.hardEdge,
+                                                      child: kIsWeb
+                                                          ? Image.network(file.path,
+                                                              fit: BoxFit.cover)
+                                                          : const Icon(Icons
+                                                              .insert_drive_file),
+                                                    ),
+                                                    Positioned(
+                                                      right: -8,
+                                                      top: -8,
+                                                      child: InkWell(
+                                                        onTap: () => _removeFile(file),
+                                                        child: Container(
+                                                          padding:
+                                                              const EdgeInsets.all(4),
+                                                          decoration:
+                                                              const BoxDecoration(
+                                                            color: Colors.red,
+                                                            shape: BoxShape.circle,
+                                                          ),
+                                                          child: const Icon(
+                                                              Icons.close,
+                                                              color: Colors.white,
+                                                              size: 12),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                );
+                                              }).toList(),
+                                              if (_evidenceFiles.length < 4)
+                                                InkWell(
+                                                  onTap: _pickMedia,
+                                                  child: Container(
+                                                    width: 80,
+                                                    height: 80,
+                                                    decoration: BoxDecoration(
+                                                      borderRadius: BorderRadius.circular(8),
+                                                      border: Border.all(
+                                                        color: cs.primary.withOpacity(0.3),
+                                                        width: 2,
+                                                        style: BorderStyle.solid,
+                                                      ),
+                                                      color: cs.primary.withOpacity(0.05),
+                                                    ),
+                                                    child: Center(
+                                                      child: Icon(Icons.add,
+                                                          color: cs.primary, size: 32),
                                                     ),
                                                   ),
-                                                  const Icon(Icons.edit,
-                                                      color: Colors.white70,
-                                                      size: 14),
-                                                ],
+                                                ),
+                                            ],
+                                          ),
+                                          if (_evidenceFiles.isNotEmpty)
+                                            Padding(
+                                              padding: const EdgeInsets.only(top: 8.0, left: 4.0),
+                                              child: Text(
+                                                '${(_totalEvidenceSizeInBytes / (1024 * 1024)).toStringAsFixed(2)}MB / 5.00MB used',
+                                                style: theme.textTheme.labelSmall?.copyWith(
+                                                  color: cs.onSurface.withOpacity(0.5),
+                                                ),
                                               ),
                                             ),
-                                          ),
                                         ],
                                       ),
                                     )
@@ -400,6 +506,7 @@ class _InputEmergencyDetailsState extends State<InputEmergencyDetails> {
                                       mainAxisAlignment:
                                           MainAxisAlignment.center,
                                       children: [
+                                        const SizedBox(height: 16),
                                         Container(
                                           padding: const EdgeInsets.all(16.0),
                                           decoration: const BoxDecoration(
@@ -430,13 +537,14 @@ class _InputEmergencyDetailsState extends State<InputEmergencyDetails> {
                                         ),
                                         const SizedBox(height: 4),
                                         Text(
-                                          'Capture or select from gallery',
+                                          'Capture or select from gallery (Max 4)',
                                           style: theme.textTheme.labelMedium
                                               ?.copyWith(
                                             color:
                                                 cs.onSurface.withOpacity(0.5),
                                           ),
                                         ),
+                                        const SizedBox(height: 16),
                                       ],
                                     ),
                             ),
@@ -461,17 +569,26 @@ class _InputEmergencyDetailsState extends State<InputEmergencyDetails> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.location_on,
-                                color: Colors.white, size: 20),
-                            const SizedBox(width: 12),
-                            Text(
-                              'Review Emergency',
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0.5,
+                            if (_isLocating)
+                              const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                    color: Colors.white, strokeWidth: 2.5),
+                              )
+                            else ...[
+                              const Icon(Icons.location_on,
+                                  color: Colors.white, size: 20),
+                              const SizedBox(width: 12),
+                              Text(
+                                'Review Emergency',
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.5,
+                                ),
                               ),
-                            ),
+                            ]
                           ],
                         ),
                       ),

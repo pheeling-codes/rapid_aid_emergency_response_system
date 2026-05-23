@@ -62,6 +62,12 @@ class CustomUser(AbstractUser):
     )
 
     # ── Security & Recovery ─────────────────────────────────
+    profile_image = models.TextField(
+        blank=True,
+        null=True,
+        help_text='Base64 encoded profile image string.',
+    )
+
     reset_code = models.CharField(
         max_length=6,
         blank=True,

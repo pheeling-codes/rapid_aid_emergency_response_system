@@ -3,6 +3,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get_it/get_it.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
 
 import 'core/theme/theme.dart';
 import 'core/routing/router_config.dart';
@@ -41,6 +45,18 @@ Future<void> _initDependencies() async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: ".env");
+
+  if (kIsWeb) {
+    final apiKey = dotenv.env['GOOGLE_MAPS_API_KEY'];
+    if (apiKey != null) {
+      final script = html.ScriptElement()
+        ..src = 'https://maps.googleapis.com/maps/api/js?key=$apiKey'
+        ..type = 'text/javascript';
+      html.document.head?.append(script);
+    }
+  }
+
   await _initDependencies();
   runApp(const RapidAidApp());
 }

@@ -74,7 +74,7 @@ class UserDetailSerializer(SanitizeMixin, serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'username', 'email', 'first_name', 'last_name',
-            'phone_number', 'role', 'is_available', 'date_joined',
+            'phone_number', 'role', 'is_available', 'date_joined', 'profile_image'
         ]
         read_only_fields = ['id', 'username', 'role', 'date_joined']
 

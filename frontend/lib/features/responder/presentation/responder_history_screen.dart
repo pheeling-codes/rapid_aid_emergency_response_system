@@ -3,6 +3,10 @@ import '../../../core/theme/theme.dart';
 import '../../../core/widgets/rapid_aid_logo.dart';
 import 'responder_incident_detail.dart';
 
+import '../../../main.dart';
+import '../../../core/network/network_client.dart';
+import '../../../core/widgets/premium_empty_state.dart';
+
 class ResponderHistoryScreen extends StatefulWidget {
   const ResponderHistoryScreen({super.key});
 
@@ -12,6 +16,9 @@ class ResponderHistoryScreen extends StatefulWidget {
 
 class _ResponderHistoryScreenState extends State<ResponderHistoryScreen> {
   int _selectedFilter = 0;
+  List<_IncidentRecord> _incidents = [];
+  bool _isLoading = true;
+  String _errorMessage = '';
 
   final List<String> _filters = [
     'All Incidents',
@@ -21,75 +28,93 @@ class _ResponderHistoryScreenState extends State<ResponderHistoryScreen> {
     'Security',
   ];
 
-  final List<_IncidentRecord> _incidents = [
-    _IncidentRecord(
-      category: 'Medical',
-      icon: Icons.medical_services_rounded,
-      iconBg: Color(0xFFFFEBEE),
-      iconColor: Color(0xFFD32F2F),
-      title: 'Cardiac Arrest',
-      address: '452 Oak Avenue, Medical Center District',
-      time: 'Today • 14:22',
-      status: 'RESOLVED',
-    ),
-    _IncidentRecord(
-      category: 'Fire',
-      icon: Icons.local_fire_department_rounded,
-      iconBg: Color(0xFFFFF3E0),
-      iconColor: Color(0xFFE65100),
-      title: 'Kitchen Fire (Code 2)',
-      address: '881 West Side Plaza, Apt 402',
-      time: 'Today • 11:05',
-      status: 'RESOLVED',
-    ),
-    _IncidentRecord(
-      category: 'Accidents',
-      icon: Icons.car_crash,
-      iconBg: Color(0xFFE3F2FD),
-      iconColor: Color(0xFF1565C0),
-      title: 'Traffic Collision',
-      address: 'Intersection of 5th & Broadway',
-      time: 'Yesterday • 23:45',
-      status: 'RESOLVED',
-    ),
-    _IncidentRecord(
-      category: 'Medical',
-      icon: Icons.medical_services,
-      iconBg: Color(0xFFFFEBEE),
-      iconColor: Color(0xFFD32F2F),
-      title: 'Respiratory Distress',
-      address: 'Golden Years Nursing Home, Wing B',
-      time: 'Yesterday • 19:10',
-      status: 'RESOLVED',
-    ),
-    _IncidentRecord(
-      category: 'Security',
-      icon: Icons.security_rounded,
-      iconBg: Color(0xFFE8F5E9),
-      iconColor: Color(0xFF2E7D32),
-      title: 'Threat Assessment',
-      address: 'Central Park Precinct, Gate 3',
-      time: '2 days ago • 09:30',
-      status: 'RESOLVED',
-    ),
-    _IncidentRecord(
-      category: 'Fire',
-      icon: Icons.local_fire_department_rounded,
-      iconBg: Color(0xFFFFF3E0),
-      iconColor: Color(0xFFE65100),
-      title: 'Chemical Plant Leak',
-      address: 'Industrial District, Sector 7',
-      time: '3 days ago • 15:55',
-      status: 'RESOLVED',
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _fetchHistory();
+  }
+
+  Future<void> _fetchHistory() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+    });
+    try {
+      final dio = getIt<NetworkClient>().dio;
+      final response = await dio.get('/incidents/');
+      final data = response.data as List<dynamic>;
+
+      setState(() {
+        _incidents = data.map((json) {
+          final type = json['category'] ?? 'OTHER';
+          return _IncidentRecord(
+            category: _capitalize(type),
+            icon: _getCategoryIcon(type),
+            iconBg: _getCategoryBg(type),
+            iconColor: _getCategoryColor(type),
+            title: json['title'] ?? 'Emergency: $type',
+            address: json['address'] ?? 'Unknown Location',
+            time: _formatDate(json['created_at']),
+            status: json['status'] ?? 'PENDING',
+          );
+        }).toList();
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Failed to load history.';
+      });
+    }
+  }
+
+  String _capitalize(String s) => s.isNotEmpty ? s[0].toUpperCase() + s.substring(1).toLowerCase() : '';
+
+  IconData _getCategoryIcon(String type) {
+    switch (type.toLowerCase()) {
+      case 'medical': return Icons.medical_services_rounded;
+      case 'fire': return Icons.local_fire_department_rounded;
+      case 'accident': return Icons.car_crash;
+      case 'security': return Icons.security_rounded;
+      default: return Icons.emergency;
+    }
+  }
+
+  Color _getCategoryColor(String type) {
+    switch (type.toLowerCase()) {
+      case 'medical': return const Color(0xFFD32F2F);
+      case 'fire': return const Color(0xFFE65100);
+      case 'accident': return const Color(0xFF1565C0);
+      case 'security': return const Color(0xFF2E7D32);
+      default: return Colors.grey.shade700;
+    }
+  }
+
+  Color _getCategoryBg(String type) {
+    switch (type.toLowerCase()) {
+      case 'medical': return const Color(0xFFFFEBEE);
+      case 'fire': return const Color(0xFFFFF3E0);
+      case 'accident': return const Color(0xFFE3F2FD);
+      case 'security': return const Color(0xFFE8F5E9);
+      default: return Colors.grey.shade200;
+    }
+  }
+
+  String _formatDate(String? dateStr) {
+    if (dateStr == null) return '';
+    try {
+      final date = DateTime.parse(dateStr).toLocal();
+      return '${date.day}/${date.month} • ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return '';
+    }
+  }
 
   List<_IncidentRecord> get _filtered {
     if (_selectedFilter == 0) return _incidents;
     final label = _filters[_selectedFilter];
     return _incidents
-        .where((i) =>
-            i.category.toLowerCase() == label.toLowerCase())
+        .where((i) => i.category.toLowerCase() == label.toLowerCase() || (label.toLowerCase() == 'accidents' && i.category.toLowerCase() == 'accident'))
         .toList();
   }
 
@@ -227,17 +252,26 @@ class _ResponderHistoryScreenState extends State<ResponderHistoryScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    if (filtered.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 32),
-                        child: Center(
-                          child: Text(
-                            'No incidents in this category.',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: cs.onSurface.withOpacity(0.4),
-                            ),
-                          ),
-                        ),
+                    if (_isLoading)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 32),
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    else if (_errorMessage.isNotEmpty)
+                      PremiumEmptyState(
+                        icon: Icons.error_outline,
+                        title: 'Failed to Load History',
+                        message: _errorMessage,
+                        actionLabel: 'Try Again',
+                        onAction: _fetchHistory,
+                      )
+                    else if (filtered.isEmpty)
+                      PremiumEmptyState(
+                        icon: Icons.history,
+                        title: 'No Incidents',
+                        message: 'There are no incidents matching this category.',
+                        actionLabel: 'Refresh',
+                        onAction: _fetchHistory,
                       )
                     else
                       ...filtered.map(

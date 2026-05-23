@@ -3,7 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/theme.dart';
 import '../../../core/widgets/rapid_aid_logo.dart';
+import '../../../core/widgets/user_profile_avatar.dart';
 import 'critical_incident_popup.dart';
+import '../../../main.dart';
+import '../../../features/auth/data/token_storage.dart';
 
 class ResponderDashboard extends StatefulWidget {
   const ResponderDashboard({super.key});
@@ -22,6 +25,9 @@ class _ResponderDashboardState extends State<ResponderDashboard>
 
   // Simulated shift timer state
   int _hours = 4, _minutes = 12, _seconds = 5;
+  String _userEmail = '';
+  String _userRole = '';
+  String _userName = '';
 
   final List<Map<String, String>> _shiftHistory = [
     {
@@ -56,6 +62,11 @@ class _ResponderDashboardState extends State<ResponderDashboard>
 
     // Schedule the first popup
     _scheduleDispatchPopup();
+
+    final ts = getIt<TokenStorage>();
+    _userEmail = ts.getUserEmail() ?? 'Responder';
+    _userRole = ts.getUserRole() ?? 'RESPONDER';
+    _userName = ts.getUserName() ?? _userEmail.split('@').first;
   }
 
   void _scheduleDispatchPopup() {
@@ -119,8 +130,31 @@ class _ResponderDashboardState extends State<ResponderDashboard>
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  _ProfileAvatar(cs: cs),
+                  Row(
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            _userName,
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          Text(
+                            _userRole,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: cs.primary,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(width: 8),
+                      _ProfileAvatar(cs: cs),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -239,12 +273,7 @@ class _ProfileAvatar extends StatelessWidget {
         shape: BoxShape.circle,
         border: Border.all(color: cs.surfaceContainerHigh, width: 2),
       ),
-      child: CircleAvatar(
-        radius: 16,
-        backgroundColor: cs.surfaceContainerLow,
-        child: Icon(Icons.person_rounded,
-            color: cs.onSurface.withOpacity(0.6), size: 20),
-      ),
+      child: const UserProfileAvatar(radius: 16, defaultIcon: Icons.person_rounded),
     );
   }
 }

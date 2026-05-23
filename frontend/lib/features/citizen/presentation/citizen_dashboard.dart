@@ -4,6 +4,10 @@ import '../../../core/theme/theme.dart';
 import '../../../core/widgets/ambient_shadow.dart';
 import '../../../core/widgets/rapid_aid_logo.dart';
 import '../../../core/widgets/rapid_aid_button.dart';
+import '../../../core/widgets/user_profile_avatar.dart';
+import '../../../main.dart';
+import '../../../features/auth/data/token_storage.dart';
+import 'package:geolocator/geolocator.dart';
 
 class CitizenDashboard extends StatefulWidget {
   const CitizenDashboard({super.key});
@@ -32,6 +36,37 @@ class _CitizenDashboardState extends State<CitizenDashboard> {
     },
   ];
 
+  String _userEmail = '';
+  String _userRole = '';
+  String _userName = '';
+
+  @override
+  void initState() {
+    super.initState();
+    final ts = getIt<TokenStorage>();
+    _userEmail = ts.getUserEmail() ?? 'Citizen';
+    _userRole = ts.getUserRole() ?? 'CITIZEN';
+    _userName = ts.getUserName() ?? _userEmail.split('@').first;
+
+    // Prompt location access globally
+    _requestLocationPermission();
+  }
+
+  Future<void> _requestLocationPermission() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      return;
+    }
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -58,18 +93,37 @@ class _CitizenDashboardState extends State<CitizenDashboard> {
                       letterSpacing: 1.2,
                     ),
                   ),
-                  Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border:
-                          Border.all(color: cs.surfaceContainerHigh, width: 2),
-                    ),
-                    child: CircleAvatar(
-                      radius: 16,
-                      backgroundColor: cs.surfaceContainerLow,
-                      child: Icon(Icons.person,
-                          color: cs.onSurface.withOpacity(0.7), size: 20),
-                    ),
+                  Row(
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            _userName,
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          Text(
+                            _userRole,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: cs.primary,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border:
+                              Border.all(color: cs.surfaceContainerHigh, width: 2),
+                        ),
+                        child: const UserProfileAvatar(radius: 16),
+                      ),
+                    ],
                   ),
                 ],
               ),

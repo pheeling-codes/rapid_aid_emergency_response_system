@@ -16,6 +16,8 @@ from .serializers import (
 )
 
 
+from accounts.permissions import IsCitizen, IsDispatcher, IsResponder
+
 class IncidentListView(generics.ListAPIView):
     """GET /api/incidents/ — List all incidents."""
     serializer_class = IncidentSerializer
@@ -34,7 +36,7 @@ class IncidentListView(generics.ListAPIView):
 class IncidentCreateView(generics.CreateAPIView):
     """POST /api/incidents/ — Report a new incident."""
     serializer_class = IncidentCreateSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, IsCitizen]
 
 
 class IncidentDetailView(generics.RetrieveUpdateAPIView):
@@ -49,7 +51,7 @@ class NearestRespondersView(APIView):
     GET /api/incidents/<pk>/nearest-responders/
     Find the nearest available responders to an incident within a radius.
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, IsDispatcher]
 
     def get(self, request, pk):
         try:

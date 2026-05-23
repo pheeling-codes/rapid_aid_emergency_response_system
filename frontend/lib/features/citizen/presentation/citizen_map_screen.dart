@@ -3,7 +3,11 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/theme.dart';
 import '../../../core/widgets/rapid_aid_logo.dart';
+import '../../../core/network/network_client.dart';
+import '../../../core/widgets/user_profile_avatar.dart';
 import '../services/location_service.dart';
+import '../../../main.dart';
+import '../../../features/auth/data/token_storage.dart';
 
 /// Citizen Map Screen
 class CitizenMapScreen extends StatefulWidget {
@@ -18,10 +22,16 @@ class _CitizenMapScreenState extends State<CitizenMapScreen>
   late AnimationController _controller;
   late Animation<double> _pulseAnimation;
   final LocationService _locationService = LocationService();
+  String _userName = '';
+  String _userRole = '';
 
   @override
   void initState() {
     super.initState();
+    final ts = getIt<TokenStorage>();
+    final email = ts.getUserEmail() ?? 'Citizen';
+    _userRole = ts.getUserRole() ?? 'CITIZEN';
+    _userName = ts.getUserName() ?? email.split('@').first;
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2000),
@@ -190,18 +200,37 @@ class _CitizenMapScreenState extends State<CitizenMapScreen>
                       letterSpacing: 0.5,
                     ),
                   ),
-                  Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border:
-                          Border.all(color: cs.surfaceContainerHigh, width: 2),
-                    ),
-                    child: CircleAvatar(
-                      radius: 16,
-                      backgroundColor: cs.surfaceContainerLow,
-                      child: Icon(Icons.person,
-                          color: cs.onSurface.withOpacity(0.7), size: 20),
-                    ),
+                  Row(
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            _userName,
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          Text(
+                            _userRole,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: cs.primary,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border:
+                              Border.all(color: cs.surfaceContainerHigh, width: 2),
+                        ),
+                        child: const UserProfileAvatar(radius: 16),
+                      ),
+                    ],
                   ),
                 ],
               ),

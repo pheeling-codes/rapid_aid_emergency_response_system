@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/theme.dart';
+import '../../../core/widgets/user_profile_avatar.dart';
+import '../../../main.dart';
+import '../../../features/auth/data/token_storage.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -11,6 +14,18 @@ class AdminDashboardScreen extends StatefulWidget {
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   int _selectedIncidentIndex = 0;
   int _selectedUnitIndex = 0;
+  String _userEmail = '';
+  String _userName = '';
+  String _userRole = '';
+
+  @override
+  void initState() {
+    super.initState();
+    final ts = getIt<TokenStorage>();
+    _userEmail = ts.getUserEmail() ?? 'Admin';
+    _userName = ts.getUserName() ?? _userEmail.split('@').first;
+    _userRole = ts.getUserRole() ?? 'DISPATCHER';
+  }
 
   final List<Map<String, dynamic>> _incidents = [
     {
@@ -148,18 +163,37 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   ],
                 ),
                 const SizedBox(width: 24),
-                // Profile Avatar
-                Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: cs.onSurface.withOpacity(0.1), width: 2),
-                  ),
-                  child: CircleAvatar(
-                    radius: 16,
-                    backgroundColor: cs.surfaceContainerLow,
-                    child: Icon(Icons.person,
-                        color: cs.onSurface.withOpacity(0.7), size: 20),
-                  ),
+                // Profile Avatar & Info
+                Row(
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          _userName,
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          _userRole,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: cs.primary,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: cs.onSurface.withOpacity(0.1), width: 2),
+                      ),
+                      child: const UserProfileAvatar(radius: 16),
+                    ),
+                  ],
                 ),
               ],
             ),

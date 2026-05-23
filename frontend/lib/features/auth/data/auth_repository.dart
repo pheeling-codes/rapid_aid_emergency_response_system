@@ -51,11 +51,21 @@ class AuthRepository {
     );
 
     // Persist user metadata for fast access
+    final firstName = userData['first_name'] as String? ?? '';
+    final lastName = userData['last_name'] as String? ?? '';
+    final fullName = [firstName, lastName].where((s) => s.isNotEmpty).join(' ');
+
     await _tokenStorage.saveUserMeta(
       role: userData['role'] as String? ?? role.backendRole,
       email: userData['email'] as String? ?? sanitizedEmail,
       userId: (userData['id'] ?? '').toString(),
+      name: fullName.isNotEmpty ? fullName : null,
     );
+
+    final profileImage = userData['profile_image'] as String?;
+    if (profileImage != null && profileImage.isNotEmpty) {
+      await _tokenStorage.saveProfileImage(profileImage);
+    }
 
     return userData;
   }
@@ -137,7 +147,14 @@ class AuthRepository {
   /// Returns user profile data or throws on invalid/expired token.
   Future<Map<String, dynamic>> getProfile() async {
     final response = await _dio.get('/auth/me/');
-    return response.data as Map<String, dynamic>;
+    final userData = response.data as Map<String, dynamic>;
+    
+    final profileImage = userData['profile_image'] as String?;
+    if (profileImage != null && profileImage.isNotEmpty) {
+      await _tokenStorage.saveProfileImage(profileImage);
+    }
+    
+    return userData;
   }
 
   /// Clear all stored tokens and user metadata.

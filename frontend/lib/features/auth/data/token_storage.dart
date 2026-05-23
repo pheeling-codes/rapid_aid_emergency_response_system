@@ -3,13 +3,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 /// Secure wrapper for JWT token persistence.
 /// Access/Refresh tokens → FlutterSecureStorage (encrypted).
-/// User metadata (role, email) → SharedPreferences (fast access).
+/// User metadata (role, email, name, profile image) → SharedPreferences (fast access).
 class TokenStorage {
   static const _accessTokenKey = 'rapid_aid_access_token';
   static const _refreshTokenKey = 'rapid_aid_refresh_token';
   static const _userRoleKey = 'rapid_aid_user_role';
   static const _userEmailKey = 'rapid_aid_user_email';
   static const _userIdKey = 'rapid_aid_user_id';
+  static const _userNameKey = 'rapid_aid_user_name';
+  static const _profileImageKey = 'rapid_aid_profile_image';
 
   final FlutterSecureStorage _secureStorage;
   final SharedPreferences _prefs;
@@ -48,6 +50,8 @@ class TokenStorage {
     await _prefs.remove(_userRoleKey);
     await _prefs.remove(_userEmailKey);
     await _prefs.remove(_userIdKey);
+    await _prefs.remove(_userNameKey);
+    await _prefs.remove('rapid_aid_profile_image');
   }
 
   /// Returns true if an access token exists in storage.
@@ -62,10 +66,30 @@ class TokenStorage {
     required String role,
     required String email,
     required String userId,
+    String? name,
   }) async {
     await _prefs.setString(_userRoleKey, role);
     await _prefs.setString(_userEmailKey, email);
     await _prefs.setString(_userIdKey, userId);
+    if (name != null) {
+      await _prefs.setString(_userNameKey, name);
+    }
+  }
+
+  Future<void> saveUserName(String name) async {
+    await _prefs.setString(_userNameKey, name);
+  }
+
+  String? getUserName() {
+    return _prefs.getString(_userNameKey);
+  }
+
+  Future<void> saveProfileImage(String base64Image) async {
+    await _prefs.setString(_profileImageKey, base64Image);
+  }
+
+  String? getProfileImage() {
+    return _prefs.getString(_profileImageKey);
   }
 
   String? getUserRole() => _prefs.getString(_userRoleKey);
