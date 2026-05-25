@@ -87,28 +87,38 @@ class _ConfirmDispatchState extends State<ConfirmDispatch> {
               streetName = c['long_name'];
             }
             if (types.contains('locality')) locality = c['long_name'];
-            if (types.contains('administrative_area_level_1'))
-              adminArea = c['short_name'];
+            if (types.contains('administrative_area_level_1')) {
+              adminArea = c['long_name'];
+            }
             if (types.contains('country')) country = c['long_name'];
           }
           final formatted = results.first['formatted_address'] as String;
 
           if (streetName.isEmpty || streetName.contains('+')) {
             final parts = formatted.split(',');
-            for (var p in parts) {
-              if (!p.contains('+')) {
-                streetName = p.trim();
-                break;
+            if (parts.isNotEmpty) {
+              String firstPart = parts[0].trim();
+              if (firstPart.contains('+')) {
+                final spaceIdx = firstPart.indexOf(' ');
+                if (spaceIdx != -1 && spaceIdx < firstPart.length - 1) {
+                  firstPart = firstPart.substring(spaceIdx + 1).trim();
+                } else if (parts.length > 1) {
+                  firstPart = parts[1].trim();
+                }
               }
+              streetName = firstPart;
             }
           }
 
           setState(() {
-            _addressLine1 = streetName.isNotEmpty
-                ? streetName
-                : (locality.isNotEmpty ? locality : 'Unknown Street');
+            _addressLine1 = [
+              if (streetName.isNotEmpty) streetName,
+              if (locality.isNotEmpty && locality != streetName) locality
+            ].join(', ');
+            
+            if (_addressLine1.isEmpty) _addressLine1 = 'Unknown Location';
+
             _addressLine2 = [
-              if (locality.isNotEmpty) locality,
               if (adminArea.isNotEmpty) adminArea,
               if (country.isNotEmpty) country
             ].join(', ');
@@ -148,7 +158,7 @@ class _ConfirmDispatchState extends State<ConfirmDispatch> {
       final Map<String, dynamic> data = {
         'title': 'Emergency: ${widget.emergencyType}',
         'description': widget.description,
-        'category': widget.emergencyType.toUpperCase(),
+        'category': widget.emergencyType.toUpperCase() == 'SECURITY' ? 'CRIME' : widget.emergencyType.toUpperCase(),
         'severity': 'HIGH',
         'address': [
           _addressLine1, 

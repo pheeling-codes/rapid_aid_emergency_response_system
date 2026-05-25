@@ -22,6 +22,7 @@ class CitizenHistoryScreen extends StatefulWidget {
 
 class _CitizenHistoryScreenState extends State<CitizenHistoryScreen> {
   String _selectedFilter = 'All';
+  String _selectedStatusFilter = 'All';
   List<Map<String, dynamic>> _reports = [];
   bool _isLoading = true;
   String _errorMessage = '';
@@ -46,19 +47,22 @@ class _CitizenHistoryScreenState extends State<CitizenHistoryScreen> {
     try {
       final dio = getIt<NetworkClient>().dio;
       final response = await dio.get('/incidents/');
+      
       final data = response.data as List<dynamic>;
       
       setState(() {
         _reports = data.map((json) {
           final type = json['category'] ?? 'OTHER';
+          final displayType = type == 'CRIME' ? 'Security' : _capitalize(type);
+          
           return {
             'id': json['id'] ?? '',
-            'type': 'Emergency: $type',
-            'category': _capitalize(type),
+            'type': 'Emergency: $displayType',
+            'category': displayType,
             'icon': _getCategoryIcon(type),
             'color': _getCategoryColor(type),
             'date': _formatDate(json['created_at']),
-            'status': json['status'] ?? 'PENDING',
+            'status': json['status'] == 'PENDING' ? 'ACTIVE' : (json['status'] ?? 'ACTIVE'),
             'statusColor': _getStatusColor(json['status']),
             'statusBg': _getStatusBg(json['status']),
             'address': (json['address'] != null && json['address'].toString().isNotEmpty) ? json['address'] : 'Unknown Location',
@@ -82,7 +86,8 @@ class _CitizenHistoryScreenState extends State<CitizenHistoryScreen> {
       case 'medical': return Icons.medical_services;
       case 'fire': return Icons.local_fire_department;
       case 'accident': return Icons.car_crash;
-      case 'security': return Icons.security;
+      case 'security': 
+      case 'crime': return Icons.security;
       default: return Icons.emergency;
     }
   }
@@ -92,7 +97,8 @@ class _CitizenHistoryScreenState extends State<CitizenHistoryScreen> {
       case 'medical': return AppTheme.emergencyUrl;
       case 'fire': return const Color(0xFFEA580C);
       case 'accident': return const Color(0xFF1E3A8A);
-      case 'security': return const Color(0xFF7E22CE);
+      case 'security': 
+      case 'crime': return const Color(0xFF7E22CE);
       default: return Colors.grey.shade700;
     }
   }
@@ -125,9 +131,11 @@ class _CitizenHistoryScreenState extends State<CitizenHistoryScreen> {
     final cs = theme.colorScheme;
 
     // Filter reports
-    final filteredReports = _selectedFilter == 'All'
-        ? _reports
-        : _reports.where((r) => r['category'] == _selectedFilter).toList();
+    final filteredReports = _reports.where((r) {
+      final matchesCategory = _selectedFilter == 'All' || r['category'] == _selectedFilter;
+      final matchesStatus = _selectedStatusFilter == 'All' || r['status'].toString().toUpperCase() == _selectedStatusFilter.toUpperCase();
+      return matchesCategory && matchesStatus;
+    }).toList();
 
     return Scaffold(
       backgroundColor: cs.surfaceContainerLowest, // Light background
@@ -213,15 +221,15 @@ class _CitizenHistoryScreenState extends State<CitizenHistoryScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  // Filter Dropdown
+                  const SizedBox(width: 8),
+                  // Category Filter Dropdown
                   Container(
                     decoration: BoxDecoration(
                       color: cs.surfaceContainerLow,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: PopupMenuButton<String>(
-                      icon: Icon(Icons.tune,
+                      icon: Icon(Icons.grid_view_rounded,
                           color: cs.onSurface.withOpacity(0.8)),
                       offset: const Offset(0, 40),
                       shape: RoundedRectangleBorder(
@@ -231,29 +239,90 @@ class _CitizenHistoryScreenState extends State<CitizenHistoryScreen> {
                           _selectedFilter = result;
                         });
                       },
-                      itemBuilder: (BuildContext context) =>
-                          <PopupMenuEntry<String>>[
-                        const PopupMenuItem<String>(
-                          value: 'All',
-                          child: Text('All'),
-                        ),
-                        const PopupMenuItem<String>(
-                          value: 'Medical',
-                          child: Text('Medical'),
-                        ),
-                        const PopupMenuItem<String>(
-                          value: 'Fire',
-                          child: Text('Fire'),
-                        ),
-                        const PopupMenuItem<String>(
-                          value: 'Accident',
-                          child: Text('Accident'),
-                        ),
-                        const PopupMenuItem<String>(
-                          value: 'Security',
-                          child: Text('Security'),
-                        ),
-                      ],
+                      itemBuilder: (BuildContext context) {
+                        Widget buildItem(String value, String text, String currentFilter) {
+                          final isActive = currentFilter == value;
+                          return Text(
+                            text,
+                            style: TextStyle(
+                              fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                              color: isActive ? cs.primary : cs.onSurface,
+                            ),
+                          );
+                        }
+                        return <PopupMenuEntry<String>>[
+                          PopupMenuItem<String>(
+                            value: 'All',
+                            child: buildItem('All', 'All Categories', _selectedFilter),
+                          ),
+                          PopupMenuItem<String>(
+                            value: 'Medical',
+                            child: buildItem('Medical', 'Medical', _selectedFilter),
+                          ),
+                          PopupMenuItem<String>(
+                            value: 'Fire',
+                            child: buildItem('Fire', 'Fire', _selectedFilter),
+                          ),
+                          PopupMenuItem<String>(
+                            value: 'Accident',
+                            child: buildItem('Accident', 'Accident', _selectedFilter),
+                          ),
+                          PopupMenuItem<String>(
+                            value: 'Security',
+                            child: buildItem('Security', 'Security', _selectedFilter),
+                          ),
+                        ];
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Status Filter Dropdown
+                  Container(
+                    decoration: BoxDecoration(
+                      color: cs.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: PopupMenuButton<String>(
+                      icon: Icon(Icons.filter_list,
+                          color: cs.onSurface.withOpacity(0.8)),
+                      offset: const Offset(0, 40),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      onSelected: (String result) {
+                        setState(() {
+                          _selectedStatusFilter = result;
+                        });
+                      },
+                      itemBuilder: (BuildContext context) {
+                        Widget buildItem(String value, String text, String currentFilter) {
+                          final isActive = currentFilter == value;
+                          return Text(
+                            text,
+                            style: TextStyle(
+                              fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                              color: isActive ? cs.primary : cs.onSurface,
+                            ),
+                          );
+                        }
+                        return <PopupMenuEntry<String>>[
+                          PopupMenuItem<String>(
+                            value: 'All',
+                            child: buildItem('All', 'All Statuses', _selectedStatusFilter),
+                          ),
+                          PopupMenuItem<String>(
+                            value: 'Active',
+                            child: buildItem('Active', 'Active', _selectedStatusFilter),
+                          ),
+                          PopupMenuItem<String>(
+                            value: 'Resolved',
+                            child: buildItem('Resolved', 'Resolved', _selectedStatusFilter),
+                          ),
+                          PopupMenuItem<String>(
+                            value: 'Cancelled',
+                            child: buildItem('Cancelled', 'Cancelled', _selectedStatusFilter),
+                          ),
+                        ];
+                      },
                     ),
                   ),
                 ],

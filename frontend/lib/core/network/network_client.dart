@@ -11,7 +11,7 @@ class NetworkClient {
 
   NetworkClient({
     required TokenStorage tokenStorage,
-    String baseUrl = 'http://localhost:8000/api',
+    String baseUrl = 'http://127.0.0.1:8000/api',
   }) {
     dio = Dio(
       BaseOptions(
