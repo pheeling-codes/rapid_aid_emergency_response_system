@@ -42,12 +42,12 @@ class Incident(models.Model):
         HIGH = 'HIGH', 'High'
         CRITICAL = 'CRITICAL', 'Critical'
 
-    # ── Status Choices ──────────────────────────────────────
     class Status(models.TextChoices):
         PENDING = 'PENDING', 'Pending'
         ASSIGNED = 'ASSIGNED', 'Assigned'
         EN_ROUTE = 'EN_ROUTE', 'En Route'
         RESOLVED = 'RESOLVED', 'Resolved'
+        CANCELLED = 'CANCELLED', 'Cancelled'
 
     # ── Spatial ──────────────────────────────────────────────
     location = gis_models.PointField(
@@ -114,6 +114,10 @@ class Incident(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     resolved_at = models.DateTimeField(null=True, blank=True)
 
+    @property
+    def ref_id(self):
+        return str(self.id)[:6].upper()
+
     class Meta:
         verbose_name = 'Incident'
         verbose_name_plural = 'Incidents'
@@ -124,7 +128,7 @@ class Incident(models.Model):
         ]
 
     def __str__(self):
-        return f'[{self.get_status_display()}] {self.title} ({self.get_category_display()})'
+        return f'[{self.ref_id}] {self.title} ({self.get_category_display()})'
 
     # ── Spatial Query: Nearest Responders ────────────────────
     def nearest_responders(self, radius_km=10, limit=10):
@@ -165,6 +169,29 @@ class Incident(models.Model):
             .annotate(distance=Distance('location', self.location))
             .order_by('distance')[:limit]
         )
+
+
+class IncidentEvidence(models.Model):
+    """
+    Model for storing base64 image evidence attached to an incident.
+    """
+    incident = models.ForeignKey(
+        Incident,
+        on_delete=models.CASCADE,
+        related_name='evidences'
+    )
+    image_base64 = models.TextField(
+        help_text='Base64 encoded string of the uploaded image.'
+    )
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Incident Evidence'
+        verbose_name_plural = 'Incident Evidences'
+        ordering = ['uploaded_at']
+
+    def __str__(self):
+        return f"Evidence for Incident {self.incident.ref_id}"
 
 
 class ResponseLog(models.Model):

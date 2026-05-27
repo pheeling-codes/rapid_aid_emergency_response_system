@@ -48,7 +48,9 @@ class _CitizenHistoryScreenState extends State<CitizenHistoryScreen> {
       final dio = getIt<NetworkClient>().dio;
       final response = await dio.get('/incidents/');
       
-      final data = response.data as List<dynamic>;
+      final data = (response.data is List) 
+          ? response.data as List<dynamic> 
+          : (response.data['results'] as List<dynamic>?) ?? [];
       
       setState(() {
         _reports = data.map((json) {
@@ -57,21 +59,26 @@ class _CitizenHistoryScreenState extends State<CitizenHistoryScreen> {
           
           return {
             'id': json['id'] ?? '',
+            'ref_id': json['ref_id'] ?? '',
             'type': 'Emergency: $displayType',
             'category': displayType,
             'icon': _getCategoryIcon(type),
             'color': _getCategoryColor(type),
             'date': _formatDate(json['created_at']),
+            'created_at': json['created_at'] ?? '',
             'status': json['status'] == 'PENDING' ? 'ACTIVE' : (json['status'] ?? 'ACTIVE'),
             'statusColor': _getStatusColor(json['status']),
             'statusBg': _getStatusBg(json['status']),
             'address': (json['address'] != null && json['address'].toString().isNotEmpty) ? json['address'] : 'Unknown Location',
             'description': json['description'] ?? 'No description provided.',
+            'evidences': json['evidences'] ?? [],
           };
         }).toList();
         _isLoading = false;
       });
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint("Fetch history error: $e");
+      debugPrint("StackTrace: $st");
       setState(() {
         _isLoading = false;
         _errorMessage = 'Failed to load history.';
@@ -385,12 +392,15 @@ class _CitizenHistoryScreenState extends State<CitizenHistoryScreen> {
                           final report = filteredReports[index];
                           return _ReportCard(
                             report: report,
-                            onTap: () {
-                              Navigator.of(context).push(
+                            onTap: () async {
+                              final result = await Navigator.of(context).push(
                                 MaterialPageRoute(
                                   builder: (_) => CitizenReportDetail(report: report),
                                 ),
                               );
+                              if (result == true) {
+                                _fetchHistory();
+                              }
                             },
                           );
                         },

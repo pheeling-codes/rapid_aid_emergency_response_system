@@ -1,15 +1,16 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:pointer_interceptor/pointer_interceptor.dart';
 
 import '../../../core/theme/theme.dart';
 import '../../../core/widgets/rapid_aid_logo.dart';
 import '../../../core/network/network_client.dart';
 import '../../../core/widgets/user_profile_avatar.dart';
-import '../services/location_service.dart';
 import '../../../main.dart';
 import '../../../features/auth/data/token_storage.dart';
 
-/// Citizen Map Screen
 class CitizenMapScreen extends StatefulWidget {
   const CitizenMapScreen({super.key});
 
@@ -17,13 +18,18 @@ class CitizenMapScreen extends StatefulWidget {
   State<CitizenMapScreen> createState() => _CitizenMapScreenState();
 }
 
-class _CitizenMapScreenState extends State<CitizenMapScreen>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _pulseAnimation;
-  final LocationService _locationService = LocationService();
+class _CitizenMapScreenState extends State<CitizenMapScreen> {
+  final Completer<GoogleMapController> _controller = Completer();
+
   String _userName = '';
   String _userRole = '';
+  bool _isLoading = true;
+
+  List<dynamic> _activeIncidents = [];
+  Map<String, dynamic>? _selectedIncident;
+
+  Set<Marker> _markers = {};
+  Set<Polyline> _polylines = {};
 
   @override
   void initState() {
@@ -32,22 +38,165 @@ class _CitizenMapScreenState extends State<CitizenMapScreen>
     final email = ts.getUserEmail() ?? 'Citizen';
     _userRole = ts.getUserRole() ?? 'CITIZEN';
     _userName = ts.getUserName() ?? email.split('@').first;
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2000),
-    )..repeat();
-    _pulseAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-    );
-
-    _locationService.startTracking();
+    _fetchIncidents();
   }
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    _locationService.stopTracking();
-    super.dispose();
+  Future<void> _fetchIncidents() async {
+    try {
+      final dio = getIt<NetworkClient>().dio;
+      final res = await dio.get('/incidents/');
+      final dataList = (res.data is List)
+          ? res.data as List
+          : res.data['results'] as List? ?? [];
+
+      final active = dataList
+          .where((inc) =>
+              inc['status'] == 'PENDING' ||
+              inc['status'] == 'ACTIVE' ||
+              inc['status'] == 'IN_PROGRESS')
+          .toList();
+
+      if (mounted) {
+        setState(() {
+          _activeIncidents = active;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _onIncidentSelected(Map<String, dynamic> incident) {
+    setState(() {
+      _selectedIncident = incident;
+      _markers.clear();
+      _polylines.clear();
+
+      final coords = incident['location_coords'];
+      final respCoords = incident['responder_location'];
+
+      LatLng? incLatLng;
+      if (coords != null) {
+        incLatLng = LatLng(coords['lat'], coords['lng']);
+        _markers.add(Marker(
+          markerId: MarkerId('incident_${incident['id']}'),
+          position: incLatLng,
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+          infoWindow:
+              InfoWindow(title: 'Emergency', snippet: incident['title']),
+        ));
+      }
+
+      LatLng? respLatLng;
+      if (respCoords != null) {
+        respLatLng = LatLng(respCoords['lat'], respCoords['lng']);
+        _markers.add(Marker(
+          markerId: MarkerId('responder_${incident['id']}'),
+          position: respLatLng,
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+          infoWindow: InfoWindow(
+              title: 'Responder',
+              snippet: incident['responder_name'] ?? 'Assigned Unit'),
+        ));
+      }
+
+      if (incLatLng != null && respLatLng != null) {
+        _polylines.add(Polyline(
+          polylineId: PolylineId('route_${incident['id']}'),
+          points: [incLatLng, respLatLng],
+          color: AppTheme.emergencyUrl,
+          width: 5,
+        ));
+      }
+
+      if (incLatLng != null) {
+        _moveCamera(incLatLng);
+      }
+    });
+  }
+
+  Future<void> _moveCamera(LatLng target) async {
+    final GoogleMapController controller = await _controller.future;
+    controller.animateCamera(CameraUpdate.newCameraPosition(
+      CameraPosition(target: target, zoom: 15),
+    ));
+  }
+
+  void _showIncidentPicker(BuildContext context) {
+    showModalBottomSheet(
+        context: context,
+        backgroundColor: Colors.transparent,
+        isScrollControlled: true,
+        builder: (context) {
+          return PointerInterceptor(
+            child: Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.5,
+              ),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('Select Active Incident',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w800, fontSize: 18)),
+                    const SizedBox(height: 16),
+                    ListTile(
+                      leading: const Icon(Icons.map, color: Colors.grey),
+                      title: const Text('View Map Only (Clear Selection)',
+                          style: TextStyle(fontWeight: FontWeight.w600)),
+                      onTap: () {
+                        setState(() {
+                          _selectedIncident = null;
+                          _markers.clear();
+                          _polylines.clear();
+                        });
+                        Navigator.pop(context);
+                      },
+                    ),
+                    const Divider(),
+                    if (_activeIncidents.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.all(24.0),
+                        child: Text('No active incidents found.'),
+                      )
+                    else
+                      ..._activeIncidents.map((inc) {
+                        final ref = inc['ref_id'] ??
+                            inc['id'].toString().substring(0, 6);
+                        final isSelected = _selectedIncident != null &&
+                            _selectedIncident!['id'] == inc['id'];
+                        return ListTile(
+                          leading: Icon(Icons.emergency,
+                              color: isSelected
+                                  ? AppTheme.primary
+                                  : AppTheme.primary),
+                          title: Text('REF #$ref',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: isSelected ? AppTheme.primary : null)),
+                          trailing: isSelected
+                              ? const Icon(Icons.check_circle,
+                                  color: AppTheme.primary)
+                              : null,
+                          onTap: () {
+                            _onIncidentSelected(inc);
+                            Navigator.pop(context);
+                          },
+                        );
+                      }).toList(),
+                  ],
+                ),
+              ),
+            ),
+          );
+        });
   }
 
   @override
@@ -56,121 +205,27 @@ class _CitizenMapScreenState extends State<CitizenMapScreen>
     final cs = theme.colorScheme;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF75A6A2), // Map-like background color
+      backgroundColor: cs.surfaceContainerLowest,
       body: Stack(
         children: [
-          // Simulated Map Background Image or Grid
-          Positioned.fill(
-            child: Opacity(
-              opacity: 0.5,
-              child: CustomPaint(
-                painter: _MapGridPainter(),
-              ),
+          // ── MAP ────────────────────────────────────────────────────────
+          GoogleMap(
+            mapType: MapType.normal,
+            initialCameraPosition: const CameraPosition(
+              target: LatLng(6.5244, 3.3792), // Default to Lagos, Nigeria
+              zoom: 11,
             ),
+            markers: _markers,
+            polylines: _polylines,
+            myLocationEnabled: true,
+            myLocationButtonEnabled: false,
+            zoomControlsEnabled: false,
+            onMapCreated: (GoogleMapController controller) {
+              _controller.complete(controller);
+            },
           ),
 
-          // User Location Pin (Blue Pulse)
-          Positioned(
-            left: MediaQuery.of(context).size.width * 0.1,
-            top: MediaQuery.of(context).size.height * 0.3,
-            child: AnimatedBuilder(
-              animation: _pulseAnimation,
-              builder: (context, child) {
-                return SizedBox(
-                  width: 100,
-                  height: 100,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    clipBehavior: Clip.none,
-                    children: [
-                      // Blue Pulse ring
-                      Container(
-                        width: 40 + (20 * _pulseAnimation.value),
-                        height: 40 + (20 * _pulseAnimation.value),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppTheme.primary.withOpacity(
-                            0.4 * (1 - _pulseAnimation.value),
-                          ),
-                        ),
-                      ),
-                      // Marker Pin
-                      Container(
-                        width: 16,
-                        height: 16,
-                        decoration: BoxDecoration(
-                          color: AppTheme.primary,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 3),
-                          boxShadow: [
-                            BoxShadow(
-                                color: Colors.black.withOpacity(0.2),
-                                blurRadius: 4),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
-
-          // Responder Location Pin (Pulse)
-          Positioned(
-            right: MediaQuery.of(context).size.width * 0.22,
-            top: MediaQuery.of(context).size.height * 0.18,
-            child: AnimatedBuilder(
-              animation: _pulseAnimation,
-              builder: (context, child) {
-                return Stack(
-                  alignment: Alignment.center,
-                  clipBehavior: Clip.none,
-                  children: [
-                    // Pulse ring
-                    Container(
-                      width: 60 + (30 * _pulseAnimation.value),
-                      height: 60 + (30 * _pulseAnimation.value),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: AppTheme.emergencyUrl.withOpacity(
-                          0.4 * (1 - _pulseAnimation.value),
-                        ),
-                      ),
-                    ),
-                    // Marker Pin
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8.0),
-                          decoration: BoxDecoration(
-                            color: AppTheme.emergencyUrl,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2),
-                            boxShadow: [
-                              BoxShadow(
-                                  color: Colors.black.withOpacity(0.3),
-                                  blurRadius: 6),
-                            ],
-                          ),
-                          child: const Icon(Icons.emergency,
-                              color: Colors.white, size: 20),
-                        ),
-                        Container(
-                          width: 3,
-                          height: 12,
-                          color: AppTheme.emergencyUrl,
-                        ),
-                      ],
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-
-          // Topbar Overlay
+          // ── TOPBAR ───────────────────────────────────────────────────────
           Positioned(
             top: 0,
             left: 0,
@@ -193,7 +248,7 @@ class _CitizenMapScreenState extends State<CitizenMapScreen>
                 children: [
                   const RapidAidLogo(size: 32, iconSize: 30),
                   Text(
-                    'INCIDENT ACTIVE',
+                    'INCIDENT TRACKING',
                     style: theme.textTheme.titleMedium?.copyWith(
                       color: AppTheme.primary,
                       fontWeight: FontWeight.w900,
@@ -225,8 +280,8 @@ class _CitizenMapScreenState extends State<CitizenMapScreen>
                       Container(
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          border:
-                              Border.all(color: cs.surfaceContainerHigh, width: 2),
+                          border: Border.all(
+                              color: cs.surfaceContainerHigh, width: 2),
                         ),
                         child: const UserProfileAvatar(radius: 16),
                       ),
@@ -237,287 +292,229 @@ class _CitizenMapScreenState extends State<CitizenMapScreen>
             ),
           ),
 
-          // Responder En Route Top Pill
+          // ── DROPDOWN FOR INCIDENTS ─────────────────────────────────────
           Positioned(
             top: MediaQuery.of(context).padding.top + 80,
-            right: 0,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              decoration: BoxDecoration(
-                color: AppTheme.emergencyUrl.withOpacity(0.95),
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(24),
-                  bottomLeft: Radius.circular(24),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.emergencyUrl.withOpacity(0.4),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.notifications_active,
-                      color: Colors.white, size: 18),
-                  const SizedBox(width: 8),
-                  Text(
-                    'RESPONDER EN ROUTE',
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1.0,
+            left: 20,
+            right: 20,
+            child: PointerInterceptor(
+              child: Material(
+                elevation: 4,
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: _isLoading ? null : () => _showIncidentPicker(context),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 16),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: cs.onSurface.withOpacity(0.05)),
                     ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Safe Incident text overlay
-          Positioned(
-            bottom: MediaQuery.of(context).size.height * 0.45,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: Text(
-                'SAFE INCIDENT\nSAFE AT WORK',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: Colors.white.withOpacity(0.8),
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 2.0,
-                ),
-              ),
-            ),
-          ),
-
-          // Bottom Sheet (Frosted Glass)
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            height: MediaQuery.of(context).size.height * 0.48,
-            child: ClipRRect(
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(32),
-                topRight: Radius.circular(32),
-              ),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: cs.surfaceContainerLowest.withOpacity(0.9),
-                  ),
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 12),
-                      // Drag Handle (Static layout element)
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        alignment: Alignment.center,
-                        child: Container(
-                          width: 40,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: cs.onSurface.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(2),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          _isLoading
+                              ? 'Loading active incidents...'
+                              : _selectedIncident != null
+                                  ? 'REF #${_selectedIncident!['ref_id'] ?? _selectedIncident!['id'].toString().substring(0, 6)}'
+                                  : 'Select active incident...',
+                          style: TextStyle(
+                            color: _selectedIncident != null
+                                ? AppTheme.headingColor
+                                : cs.onSurface.withOpacity(0.5),
+                            fontWeight: _selectedIncident != null
+                                ? FontWeight.w800
+                                : FontWeight.w600,
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Header
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Live Activity',
-                              style: theme.textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.w800,
-                                color: cs.onSurface,
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: AppTheme.emergencyUrl.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                'ACTIVE DISPATCH',
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  color: AppTheme.emergencyUrl,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Timeline Component
-                      Expanded(
-                        child: ListView(
-                          padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                          children: [
-                            // Timeline Item 1
-                            _TimelineItem(
-                              time: '14:02',
-                              isFirst: true,
-                              child: Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(24),
-                                  boxShadow: [
-                                    BoxShadow(
-                                        color: Colors.black.withOpacity(0.02),
-                                        blurRadius: 8),
-                                  ],
-                                ),
-                                child: Text(
-                                  'Dispatch Confirmed',
-                                  style: theme.textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                    color: cs.onSurface,
-                                  ),
-                                ),
-                              ),
-                            ),
-
-                            // Timeline Item 2
-                            _TimelineItem(
-                              time: '14:03',
-                              child: Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(24),
-                                  boxShadow: [
-                                    BoxShadow(
-                                        color: Colors.black.withOpacity(0.02),
-                                        blurRadius: 8),
-                                  ],
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Unit 402 Departing Station',
-                                      style:
-                                          theme.textTheme.titleMedium?.copyWith(
-                                        fontWeight: FontWeight.w600,
-                                        color: cs.onSurface,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      'First responder unit assigned and clear for departure.',
-                                      style:
-                                          theme.textTheme.bodyMedium?.copyWith(
-                                        color: cs.onSurface.withOpacity(0.6),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-
-                            // Timeline Item 3 (Active)
-                            _TimelineItem(
-                              time: '14:05',
-                              isActive: true,
-                              isLast: true,
-                              child: Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.emergencyUrl,
-                                  borderRadius: BorderRadius.circular(24),
-                                  boxShadow: [
-                                    BoxShadow(
-                                        color: AppTheme.emergencyUrl
-                                            .withOpacity(0.3),
-                                        blurRadius: 16,
-                                        offset: const Offset(0, 8)),
-                                  ],
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'En route: Traffic on Third Mainland Bridge.',
-                                      style:
-                                          theme.textTheme.titleMedium?.copyWith(
-                                        fontWeight: FontWeight.w800,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      'ETA adjusted. Responder maintains communication.',
-                                      style:
-                                          theme.textTheme.bodyMedium?.copyWith(
-                                        color: Colors.white.withOpacity(0.9),
-                                        fontStyle: FontStyle.italic,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-
-                            // Call Responder Button
-                            Padding(
-                              padding: const EdgeInsets.only(
-                                  top: 16.0, bottom: 24.0),
-                              child: InkWell(
-                                onTap: () {},
-                                borderRadius: BorderRadius.circular(24),
-                                child: Container(
-                                  width: double.infinity,
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 20),
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.primary, // Dark button
-                                    borderRadius: BorderRadius.circular(24),
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      const Icon(Icons.call,
-                                          color: Colors.white, size: 20),
-                                      const SizedBox(width: 12),
-                                      Text(
-                                        'CALL RESPONDER',
-                                        style: theme.textTheme.titleMedium
-                                            ?.copyWith(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w800,
-                                          letterSpacing: 0.5,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                        const Icon(Icons.arrow_drop_down_circle,
+                            color: AppTheme.primary),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
           ),
+
+          // ── BOTTOM SHEET TIMELINE ──────────────────────────────────────
+          if (_selectedIncident != null)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: MediaQuery.of(context).size.height * 0.35,
+              child: ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(32),
+                  topRight: Radius.circular(32),
+                ),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: cs.surfaceContainerLowest.withOpacity(0.95),
+                    ),
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 12),
+                        // Drag Handle
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          alignment: Alignment.center,
+                          child: Container(
+                            width: 40,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: cs.onSurface.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Header
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Live Activity',
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  color: cs.onSurface,
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.emergencyUrl.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  'ACTIVE DISPATCH',
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: AppTheme.emergencyUrl,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Timeline
+                        Expanded(
+                          child: Builder(builder: (context) {
+                            final status =
+                                _selectedIncident!['status'] ?? 'ACTIVE';
+                            final isResolved = status == 'RESOLVED';
+                            final steps = [
+                              {
+                                'title': 'Emergency Dispatched',
+                                'desc':
+                                    'Emergency forces have been dispatched.',
+                                'active': true
+                              },
+                              {
+                                'title': 'Responder Assigned',
+                                'desc': 'A responder is currently en route.',
+                                'active': true
+                              },
+                              {
+                                'title': 'Incident Resolved',
+                                'desc': 'The incident has been cleared.',
+                                'active': isResolved
+                              },
+                            ];
+
+                            return ListView.builder(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 24.0, vertical: 8),
+                              itemCount: steps.length,
+                              itemBuilder: (context, index) {
+                                final step = steps[index];
+                                final isActive = step['active'] as bool;
+                                final isLast = index == 1 &&
+                                    !isResolved; // Highlight current status
+
+                                return _TimelineItem(
+                                  time: '',
+                                  isLast: isLast,
+                                  isActive: isActive,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: isLast
+                                          ? AppTheme.emergencyUrl
+                                          : Colors.white,
+                                      borderRadius: BorderRadius.circular(24),
+                                      boxShadow: [
+                                        BoxShadow(
+                                            color: isLast
+                                                ? AppTheme.emergencyUrl
+                                                    .withOpacity(0.3)
+                                                : Colors.black
+                                                    .withOpacity(0.02),
+                                            blurRadius: isLast ? 16 : 8,
+                                            offset: isLast
+                                                ? const Offset(0, 8)
+                                                : Offset.zero),
+                                      ],
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          step['title'] as String,
+                                          style: theme.textTheme.titleMedium
+                                              ?.copyWith(
+                                            fontWeight: FontWeight.w800,
+                                            color: isLast
+                                                ? Colors.white
+                                                : (isActive
+                                                    ? cs.onSurface
+                                                    : cs.onSurface
+                                                        .withOpacity(0.3)),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          step['desc'] as String,
+                                          style: theme.textTheme.bodyMedium
+                                              ?.copyWith(
+                                            color: isLast
+                                                ? Colors.white.withOpacity(0.9)
+                                                : (isActive
+                                                    ? cs.onSurface
+                                                        .withOpacity(0.6)
+                                                    : cs.onSurface
+                                                        .withOpacity(0.2)),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            );
+                          }),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -527,14 +524,12 @@ class _CitizenMapScreenState extends State<CitizenMapScreen>
 class _TimelineItem extends StatelessWidget {
   final String time;
   final Widget child;
-  final bool isFirst;
   final bool isLast;
   final bool isActive;
 
   const _TimelineItem({
     required this.time,
     required this.child,
-    this.isFirst = false,
     this.isLast = false,
     this.isActive = false,
   });
@@ -548,13 +543,11 @@ class _TimelineItem extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Time Column
           SizedBox(
             width: 32,
             child: Column(
               children: [
                 const SizedBox(height: 16),
-                // The Node Dot
                 Container(
                   width: 16,
                   height: 16,
@@ -577,7 +570,6 @@ class _TimelineItem extends StatelessWidget {
                     ),
                   ),
                 ),
-                // The Vertical Line
                 if (!isLast)
                   Expanded(
                     child: Container(
@@ -588,10 +580,7 @@ class _TimelineItem extends StatelessWidget {
               ],
             ),
           ),
-
           const SizedBox(width: 12),
-
-          // Content Column
           Expanded(
             child: Padding(
               padding: const EdgeInsets.only(bottom: 24.0),
@@ -617,26 +606,4 @@ class _TimelineItem extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Map Grid Painter for placeholder map
-class _MapGridPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white.withOpacity(0.15)
-      ..strokeWidth = 1.5;
-
-    final gridSize = 40.0;
-
-    for (double x = 0; x < size.width; x += gridSize) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
-    }
-    for (double y = 0; y < size.height; y += gridSize) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

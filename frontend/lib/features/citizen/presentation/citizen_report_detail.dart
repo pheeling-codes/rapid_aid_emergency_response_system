@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/theme.dart';
 
+import 'dart:async';
+import 'dart:convert';
+import 'package:dio/dio.dart';
+import 'package:go_router/go_router.dart';
+import '../../../core/network/network_client.dart';
+import '../../../main.dart';
+
 /// Citizen Report Detail Screen
 /// Shown when a user taps on a report card in their history.
-class CitizenReportDetail extends StatelessWidget {
+class CitizenReportDetail extends StatefulWidget {
   final Map<String, dynamic> report;
 
   const CitizenReportDetail({
@@ -12,13 +19,114 @@ class CitizenReportDetail extends StatelessWidget {
   });
 
   @override
+  State<CitizenReportDetail> createState() => _CitizenReportDetailState();
+}
+
+class _CitizenReportDetailState extends State<CitizenReportDetail> {
+  late Timer _timer;
+  int _secondsLeft = 0;
+  bool _canCancel = false;
+  bool _isCancelling = false;
+  List<dynamic> _loadedEvidences = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _calculateTimeLeft();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      _calculateTimeLeft();
+    });
+    
+    _loadedEvidences = widget.report['evidences'] as List<dynamic>? ?? [];
+    if (_loadedEvidences.isEmpty) {
+      _fetchIncidentDetails();
+    }
+  }
+
+  Future<void> _fetchIncidentDetails() async {
+    try {
+      final dio = getIt<NetworkClient>().dio;
+      final res = await dio.get('/incidents/${widget.report['id']}/');
+      if (res.data != null && res.data['evidences'] != null) {
+        if (mounted) {
+          setState(() {
+            _loadedEvidences = res.data['evidences'] as List<dynamic>;
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
+  void _calculateTimeLeft() {
+    if (widget.report['status'] != 'ACTIVE') {
+      if (_canCancel) setState(() => _canCancel = false);
+      return;
+    }
+    try {
+      final createdAt = DateTime.parse(widget.report['created_at'] as String).toLocal();
+      final difference = DateTime.now().difference(createdAt).inSeconds;
+      if (difference < 120) {
+        if (mounted) {
+          setState(() {
+            _secondsLeft = 120 - difference;
+            _canCancel = true;
+          });
+        }
+      } else {
+        if (_canCancel && mounted) {
+          setState(() {
+            _canCancel = false;
+            _secondsLeft = 0;
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _timer.cancel();
+    super.dispose();
+  }
+
+  Future<void> _cancelEmergency() async {
+    setState(() => _isCancelling = true);
+    try {
+      final dio = getIt<NetworkClient>().dio;
+      await dio.patch('/incidents/${widget.report['id']}/cancel/');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Emergency cancelled successfully.'),
+            backgroundColor: Colors.green.shade700,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        context.pop(true);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isCancelling = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to cancel emergency.'),
+            backgroundColor: Colors.red.shade900,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     
-    final color = report['color'] as Color;
-    final statusColor = report['statusColor'] as Color;
-    final statusBg = report['statusBg'] as Color;
+    final color = widget.report['color'] as Color;
+    final statusColor = widget.report['statusColor'] as Color;
+    final statusBg = widget.report['statusBg'] as Color;
+    final evidences = _loadedEvidences;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF3F4F6),
@@ -100,7 +208,7 @@ class CitizenReportDetail extends StatelessWidget {
                                   color: color.withOpacity(0.1),
                                   borderRadius: BorderRadius.circular(14),
                                 ),
-                                child: Icon(report['icon'] as IconData, color: color, size: 24),
+                                child: Icon(widget.report['icon'] as IconData, color: color, size: 24),
                               ),
                               const SizedBox(width: 14),
                               Expanded(
@@ -108,7 +216,7 @@ class CitizenReportDetail extends StatelessWidget {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      (report['category'] as String).toUpperCase(),
+                                      (widget.report['category'] as String).toUpperCase(),
                                       style: theme.textTheme.labelSmall?.copyWith(
                                         color: cs.onSurface.withOpacity(0.4),
                                         fontWeight: FontWeight.w700,
@@ -118,7 +226,7 @@ class CitizenReportDetail extends StatelessWidget {
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
-                                      report['type'] as String,
+                                      widget.report['type'] as String,
                                       style: theme.textTheme.headlineMedium?.copyWith(
                                         fontSize: 18,
                                         fontWeight: FontWeight.w800,
@@ -139,7 +247,7 @@ class CitizenReportDetail extends StatelessWidget {
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
-                                  report['status'] as String,
+                                  widget.report['status'] as String,
                                   style: theme.textTheme.labelSmall?.copyWith(
                                     color: statusColor,
                                     fontWeight: FontWeight.w800,
@@ -161,7 +269,7 @@ class CitizenReportDetail extends StatelessWidget {
                               const SizedBox(width: 6),
                               Expanded(
                                 child: Text(
-                                  report['address'] as String,
+                                  widget.report['address'] as String,
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     color: cs.onSurface.withOpacity(0.6),
                                     fontWeight: FontWeight.w500,
@@ -178,7 +286,7 @@ class CitizenReportDetail extends StatelessWidget {
                                   size: 14, color: cs.onSurface.withOpacity(0.4)),
                               const SizedBox(width: 6),
                               Text(
-                                report['date'] as String,
+                                widget.report['date'] as String,
                                 style: theme.textTheme.bodySmall?.copyWith(
                                   color: cs.onSurface.withOpacity(0.5),
                                   fontWeight: FontWeight.w500,
@@ -193,7 +301,7 @@ class CitizenReportDetail extends StatelessWidget {
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Text(
-                                  'ID #${report['id']}',
+                                  'REF #${widget.report['ref_id']}',
                                   style: theme.textTheme.labelSmall?.copyWith(
                                     color: cs.onSurface.withOpacity(0.45),
                                     fontWeight: FontWeight.w600,
@@ -222,7 +330,7 @@ class CitizenReportDetail extends StatelessWidget {
                     _StatusTracker(
                       theme: theme,
                       cs: cs,
-                      isResolved: report['status'] == 'RESOLVED',
+                      isResolved: widget.report['status'] == 'RESOLVED',
                     ),
                     const SizedBox(height: 24),
 
@@ -262,7 +370,7 @@ class CitizenReportDetail extends StatelessWidget {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            report['description'] as String,
+                            widget.report['description'] as String,
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: AppTheme.headingColor,
                               fontWeight: FontWeight.w500,
@@ -280,23 +388,90 @@ class CitizenReportDetail extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Icon(Icons.videocam_rounded, size: 16, color: color),
-                              const SizedBox(width: 8),
-                              Text(
-                                'video_evidence_1.mp4',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: color,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                          if (evidences.isEmpty)
+                            Text(
+                              'No evidence attached.',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: cs.onSurface.withOpacity(0.4),
+                                fontStyle: FontStyle.italic,
                               ),
-                            ],
-                          ),
+                            )
+                          else
+                            SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: evidences.map((base64Str) {
+                                  // Determine if we need to split data URI scheme
+                                  String pureBase64 = base64Str;
+                                  if (pureBase64.contains(',')) {
+                                    pureBase64 = pureBase64.split(',')[1];
+                                  }
+                                  return Container(
+                                    width: 100,
+                                    height: 100,
+                                    margin: const EdgeInsets.only(right: 12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black12,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    clipBehavior: Clip.hardEdge,
+                                    child: Image.memory(
+                                      base64Decode(pureBase64.replaceAll(RegExp(r'\s+'), '')),
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) =>
+                                          const Icon(Icons.broken_image, color: Colors.grey),
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                            ),
                         ],
                       ),
                     ),
                     const SizedBox(height: 32),
+
+                    if (widget.report['status'] == 'ACTIVE') ...[
+                      InkWell(
+                        onTap: _canCancel && !_isCancelling ? _cancelEmergency : null,
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 20.0),
+                          decoration: BoxDecoration(
+                            color: _canCancel ? Colors.red.shade600 : cs.onSurface.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          alignment: Alignment.center,
+                          child: _isCancelling
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                                )
+                              : Text(
+                                  _canCancel ? 'Cancel Emergency ($_secondsLeft\s)' : 'Cancel Emergency',
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    color: _canCancel ? Colors.white : cs.onSurface.withOpacity(0.4),
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                        ),
+                      ),
+                      if (!_canCancel)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12.0),
+                          child: Text(
+                            '2 full minutes have passed since the incident has been reported and hence the emergency can\'t be cancelled anymore.',
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: cs.onSurface.withOpacity(0.5),
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      const SizedBox(height: 32),
+                    ],
                   ],
                 ),
               ),

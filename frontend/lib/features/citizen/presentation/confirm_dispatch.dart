@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'dart:convert';
 import '../../../main.dart';
 import '../../../core/network/network_client.dart';
 import '../../../core/theme/theme.dart';
@@ -169,6 +170,17 @@ class _ConfirmDispatchState extends State<ConfirmDispatch> {
       if (widget.latitude != null && widget.longitude != null) {
         data['latitude'] = widget.latitude!;
         data['longitude'] = widget.longitude!;
+      }
+
+      if (widget.mediaFiles != null && widget.mediaFiles!.isNotEmpty) {
+        List<String> base64Images = [];
+        for (var file in widget.mediaFiles!) {
+          final bytes = await file.readAsBytes();
+          final base64Str = base64Encode(bytes);
+          // Prepend data URL scheme if needed or just send base64
+          base64Images.add('data:${file.mimeType ?? 'image/jpeg'};base64,$base64Str');
+        }
+        data['evidences'] = base64Images;
       }
 
       await dio.post('/incidents/create/', data: data);

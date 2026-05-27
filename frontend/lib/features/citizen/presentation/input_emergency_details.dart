@@ -398,157 +398,106 @@ class _InputEmergencyDetailsState extends State<InputEmergencyDetails> {
 
                     MouseRegion(
                       cursor: SystemMouseCursors.click,
-                      child: CustomPaint(
-                        painter: _DashedRectPainter(
-                            color: _evidenceFiles.isNotEmpty
-                                ? Colors.transparent
-                                : cs.onSurface.withOpacity(0.15)),
-                        child: Container(
-                          constraints: const BoxConstraints(minHeight: 160),
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            color: cs.surfaceContainerLowest,
-                            borderRadius: BorderRadius.circular(12.0),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: cs.surfaceContainerLowest,
+                          borderRadius: BorderRadius.circular(12.0),
+                          border: Border.all(
+                            color: cs.onSurface.withOpacity(0.15),
+                            style: BorderStyle.solid,
                           ),
-                          child: Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(12.0),
-                              onTap: _pickMedia,
-                              child: _evidenceFiles.isNotEmpty
-                                  ? Padding(
-                                      padding: const EdgeInsets.all(12),
-                                      child: Column(
-                                        children: [
-                                          Wrap(
-                                            spacing: 8,
-                                            runSpacing: 8,
-                                            children: [
-                                              ..._evidenceFiles.map((file) {
-                                                return Stack(
-                                                  clipBehavior: Clip.none,
-                                                  children: [
-                                                    Container(
-                                                      width: 80,
-                                                      height: 80,
-                                                      decoration: BoxDecoration(
-                                                        borderRadius:
-                                                            BorderRadius.circular(8),
-                                                        color: Colors.black12,
-                                                      ),
-                                                      clipBehavior: Clip.hardEdge,
-                                                      child: kIsWeb
-                                                          ? Image.network(file.path,
-                                                              fit: BoxFit.cover)
-                                                          : const Icon(Icons
-                                                              .insert_drive_file),
-                                                    ),
-                                                    Positioned(
-                                                      right: -8,
-                                                      top: -8,
-                                                      child: InkWell(
-                                                        onTap: () => _removeFile(file),
-                                                        child: Container(
-                                                          padding:
-                                                              const EdgeInsets.all(4),
-                                                          decoration:
-                                                              const BoxDecoration(
-                                                            color: Colors.red,
-                                                            shape: BoxShape.circle,
-                                                          ),
-                                                          child: const Icon(
-                                                              Icons.close,
-                                                              color: Colors.white,
-                                                              size: 12),
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                );
-                                              }).toList(),
-                                              if (_evidenceFiles.length < 4)
-                                                InkWell(
-                                                  onTap: _pickMedia,
-                                                  child: Container(
-                                                    width: 80,
-                                                    height: 80,
-                                                    decoration: BoxDecoration(
-                                                      borderRadius: BorderRadius.circular(8),
-                                                      border: Border.all(
-                                                        color: cs.primary.withOpacity(0.3),
-                                                        width: 2,
-                                                        style: BorderStyle.solid,
-                                                      ),
-                                                      color: cs.primary.withOpacity(0.05),
-                                                    ),
-                                                    child: Center(
-                                                      child: Icon(Icons.add,
-                                                          color: cs.primary, size: 32),
-                                                    ),
-                                                  ),
-                                                ),
-                                            ],
-                                          ),
-                                          if (_evidenceFiles.isNotEmpty)
-                                            Padding(
-                                              padding: const EdgeInsets.only(top: 8.0, left: 4.0),
-                                              child: Text(
-                                                '${(_totalEvidenceSizeInBytes / (1024 * 1024)).toStringAsFixed(2)}MB / 5.00MB used',
-                                                style: theme.textTheme.labelSmall?.copyWith(
-                                                  color: cs.onSurface.withOpacity(0.5),
-                                                ),
-                                              ),
-                                            ),
-                                        ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Wrap(
+                              alignment: WrapAlignment.center,
+                              spacing: 12,
+                              runSpacing: 12,
+                              children: [
+                                ..._evidenceFiles.map((file) {
+                                  return Stack(
+                                    clipBehavior: Clip.none,
+                                    children: [
+                                      Container(
+                                        width: 80,
+                                        height: 80,
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(8),
+                                          color: Colors.black12,
+                                        ),
+                                        clipBehavior: Clip.hardEdge,
+                                        child: kIsWeb
+                                            ? Image.network(file.path,
+                                                fit: BoxFit.cover)
+                                            : const Icon(Icons.insert_drive_file),
                                       ),
-                                    )
-                                  : Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        const SizedBox(height: 16),
-                                        Container(
-                                          padding: const EdgeInsets.all(16.0),
-                                          decoration: const BoxDecoration(
-                                            color: Colors.white,
-                                            shape: BoxShape.circle,
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: Color(0x0A000000),
-                                                blurRadius: 12,
-                                                offset: Offset(0, 4),
-                                              ),
-                                            ],
-                                          ),
-                                          child: Icon(
-                                            Icons.camera_alt,
-                                            color: cs.primary,
-                                            size: 28,
+                                      Positioned(
+                                        right: -8,
+                                        top: -8,
+                                        child: InkWell(
+                                          onTap: () => _removeFile(file),
+                                          child: Container(
+                                            padding: const EdgeInsets.all(4),
+                                            decoration: const BoxDecoration(
+                                              color: Colors.red,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(
+                                                Icons.close,
+                                                color: Colors.white,
+                                                size: 12),
                                           ),
                                         ),
-                                        const SizedBox(height: 16),
-                                        Text(
-                                          'Attach Photo/Video',
-                                          style: theme.textTheme.titleMedium
-                                              ?.copyWith(
-                                            fontWeight: FontWeight.w700,
-                                            color: cs.onSurface,
-                                          ),
+                                      ),
+                                    ],
+                                  );
+                                }).toList(),
+                                if (_evidenceFiles.length < 4)
+                                  InkWell(
+                                    onTap: _pickMedia,
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Container(
+                                      width: 80,
+                                      height: 80,
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: cs.primary.withOpacity(0.3),
+                                          width: 2,
+                                          style: BorderStyle.solid,
                                         ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          'Capture or select from gallery (Max 4)',
-                                          style: theme.textTheme.labelMedium
-                                              ?.copyWith(
-                                            color:
-                                                cs.onSurface.withOpacity(0.5),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 16),
-                                      ],
+                                        color: cs.primary.withOpacity(0.05),
+                                      ),
+                                      child: Center(
+                                        child: Icon(Icons.add_photo_alternate,
+                                            color: cs.primary, size: 32),
+                                      ),
                                     ),
+                                  ),
+                              ],
                             ),
-                          ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Only images are allowed (No video). Max 4 images.',
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                color: cs.onSurface.withOpacity(0.6),
+                              ),
+                            ),
+                            if (_evidenceFiles.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8.0),
+                                child: Text(
+                                  '${(_totalEvidenceSizeInBytes / (1024 * 1024)).toStringAsFixed(2)}MB / 5.00MB used',
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: cs.onSurface.withOpacity(0.5),
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                     ),

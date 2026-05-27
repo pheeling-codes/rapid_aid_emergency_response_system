@@ -143,7 +143,7 @@ if not _gdal_available:
 DATABASES = {
     'default': dj_database_url.config(
         default=config('DATABASE_URL'),
-        conn_max_age=600,
+        conn_max_age=0,
         ssl_require=True,
         engine=_db_engine,
     )

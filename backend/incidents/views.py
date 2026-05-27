@@ -10,6 +10,7 @@ from rest_framework.views import APIView
 from .models import Incident, ResponseLog
 from .serializers import (
     IncidentSerializer,
+    IncidentListSerializer,
     IncidentCreateSerializer,
     ResponseLogSerializer,
     NearestRespondersSerializer,
@@ -20,17 +21,19 @@ from accounts.permissions import IsCitizen, IsDispatcher, IsResponder
 
 class IncidentListView(generics.ListAPIView):
     """GET /api/incidents/ — List all incidents."""
-    serializer_class = IncidentSerializer
+    serializer_class = IncidentListSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
+        print(f"DEBUG: IncidentListView.get_queryset() called by {self.request.user}")
         user = self.request.user
+        queryset = Incident.objects.select_related('reporter', 'assigned_responder')
         if user.is_dispatcher or user.is_staff:
-            return Incident.objects.all()
+            return queryset.all()
         elif user.is_responder:
-            return Incident.objects.filter(assigned_responder=user)
+            return queryset.filter(assigned_responder=user)
         else:
-            return Incident.objects.filter(reporter=user)
+            return queryset.filter(reporter=user)
 
 
 class IncidentCreateView(generics.CreateAPIView):
@@ -103,3 +106,52 @@ class ResponseLogListView(generics.ListCreateAPIView):
             responder=self.request.user,
             previous_status=previous_status,
         )
+
+
+class IncidentCancelView(APIView):
+    """
+    PATCH /api/incidents/<pk>/cancel/
+    Allows citizens to cancel their own incidents if within 120 seconds of creation.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsCitizen]
+
+    def patch(self, request, pk):
+        try:
+            incident = Incident.objects.get(pk=pk, reporter=request.user)
+        except Incident.DoesNotExist:
+            return Response(
+                {'error': 'Incident not found or you do not have permission to cancel it.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Check if already cancelled or resolved
+        if incident.status in [Incident.Status.RESOLVED]:
+            return Response(
+                {'error': 'Incident cannot be cancelled from its current status.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Check 120 seconds rule
+        from django.utils import timezone
+        delta = timezone.now() - incident.created_at
+        if delta.total_seconds() > 120:
+            return Response(
+                {'error': 'Emergency cannot be cancelled after 120 seconds.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Update status
+        previous_status = incident.status
+        incident.status = Incident.Status.CANCELLED
+        incident.save()
+
+        # Log transition
+        ResponseLog.objects.create(
+            incident=incident,
+            responder=request.user,
+            status=Incident.Status.CANCELLED,
+            previous_status=previous_status,
+            note="Emergency cancelled by citizen."
+        )
+
+        return Response({'status': 'Emergency cancelled successfully.'})

@@ -34,6 +34,7 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
   bool _isLoading = true;
   bool _isSaving = false;
   int _totalReports = 0;
+  int _activeReports = 0;
 
   String? _profileImageBase64;
 
@@ -70,29 +71,43 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
       final profileRes = await client.get('/auth/me/');
       if (profileRes.data != null) {
         final data = profileRes.data;
-        final fetchedName = "${data['first_name'] ?? ''} ${data['last_name'] ?? ''}".trim();
+        final fetchedName =
+            "${data['first_name'] ?? ''} ${data['last_name'] ?? ''}".trim();
         if (fetchedName.isNotEmpty) {
-           _nameController.text = fetchedName;
-           getIt<TokenStorage>().saveUserName(fetchedName);
+          _nameController.text = fetchedName;
+          getIt<TokenStorage>().saveUserName(fetchedName);
         } else if (data['username'] != null) {
-           _nameController.text = data['username'];
-           getIt<TokenStorage>().saveUserName(data['username']);
+          _nameController.text = data['username'];
+          getIt<TokenStorage>().saveUserName(data['username']);
         }
         if (data['email'] != null) {
-           _emailController.text = data['email'];
+          _emailController.text = data['email'];
         }
-        if (data['profile_image'] != null && data['profile_image'].toString().isNotEmpty) {
-           _profileImageBase64 = data['profile_image'];
-           getIt<TokenStorage>().saveProfileImage(data['profile_image']);
+        if (data['profile_image'] != null &&
+            data['profile_image'].toString().isNotEmpty) {
+          _profileImageBase64 = data['profile_image'];
+          getIt<TokenStorage>().saveProfileImage(data['profile_image']);
         }
       }
-      
+
       final reportsRes = await client.get('/incidents/');
-      if (reportsRes.data != null && reportsRes.data is List) {
-        _totalReports = (reportsRes.data as List).length;
+      if (reportsRes.data != null) {
+        final dataList = (reportsRes.data is List)
+            ? reportsRes.data as List
+            : reportsRes.data['results'] as List? ?? [];
+        if (mounted) {
+          setState(() {
+            _totalReports = dataList.length;
+            _activeReports = dataList
+                .where((json) =>
+                    json['status'] == 'PENDING' || json['status'] == 'ACTIVE')
+                .length;
+          });
+        }
       }
-    } catch (e) {
+    } catch (e, st) {
       debugPrint("Profile fetch error: $e");
+      debugPrint("StackTrace: $st");
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -106,27 +121,28 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
       final parts = _nameController.text.trim().split(' ');
       final firstName = parts.isNotEmpty ? parts.first : '';
       final lastName = parts.length > 1 ? parts.sublist(1).join(' ') : '';
-      
+
       await client.patch('/auth/me/', data: {
         'first_name': firstName,
         'last_name': lastName,
         if (_profileImageBase64 != null) 'profile_image': _profileImageBase64,
       });
-      
+
       // Update local storage so Dashboards show the new name
       final ts = getIt<TokenStorage>();
       await ts.saveUserName(_nameController.text.trim());
       if (_profileImageBase64 != null) {
         await ts.saveProfileImage(_profileImageBase64!);
       }
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Profile saved successfully'),
             backgroundColor: const Color(0xFF004F9F),
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         );
       }
@@ -190,7 +206,8 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
                   content: const Text('Report data deleted successfully'),
                   backgroundColor: AppTheme.emergencyUrl,
                   behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                 ),
               );
             },
@@ -317,7 +334,8 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
                                   reader.onLoadEnd.listen((_) {
                                     if (context.mounted) {
                                       setState(() {
-                                        _profileImageBase64 = reader.result as String;
+                                        _profileImageBase64 =
+                                            reader.result as String;
                                       });
                                     }
                                   });
@@ -347,7 +365,9 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
                                 child: ClipOval(
                                   child: _profileImageBase64 != null
                                       ? Image.memory(
-                                          base64Decode(_profileImageBase64!.split(',').last),
+                                          base64Decode(_profileImageBase64!
+                                              .split(',')
+                                              .last),
                                           fit: BoxFit.cover,
                                         )
                                       : Icon(Icons.person,
@@ -397,7 +417,8 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
                         width: double.infinity,
                         height: 50,
                         child: ElevatedButton(
-                          onPressed: _isLoading || _isSaving ? null : _updateProfile,
+                          onPressed:
+                              _isLoading || _isSaving ? null : _updateProfile,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF004F9F),
                             shape: RoundedRectangleBorder(
@@ -468,9 +489,12 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
                                         AppTheme.emergencyUrl.withOpacity(0.2),
                                     shape: BoxShape.circle,
                                   ),
-                                    child: Center(
-                                      child: _isLoading 
-                                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator())
+                                  child: Center(
+                                    child: _isLoading
+                                        ? const SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator())
                                         : Text(
                                             '$_totalReports',
                                             style: theme.textTheme.headlineSmall
@@ -479,36 +503,47 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
                                               fontWeight: FontWeight.w900,
                                             ),
                                           ),
-                                    ),
+                                  ),
                                 ),
                               ],
                             ),
                             const SizedBox(height: 16),
-                            // Progress Bar
-                            Container(
-                              height: 6,
-                              width: double.infinity,
-                              decoration: BoxDecoration(
-                                color: cs.onSurface.withOpacity(0.05),
-                                borderRadius: BorderRadius.circular(3),
-                              ),
-                              child: FractionallySizedBox(
-                                alignment: Alignment.centerLeft,
-                                widthFactor: 0.75, // Just visual
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF004F9F),
-                                    borderRadius: BorderRadius.circular(3),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    'Active Reports in Progress',
+                                    style:
+                                        theme.textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              'Top 5% of active community responders',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: cs.onSurface.withOpacity(0.6),
-                              ),
+                                Container(
+                                  width: 60,
+                                  height: 60,
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.primary.withOpacity(0.2),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Center(
+                                    child: _isLoading
+                                        ? const SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator())
+                                        : Text(
+                                            '$_activeReports',
+                                            style: theme.textTheme.headlineSmall
+                                                ?.copyWith(
+                                              color: AppTheme.primary,
+                                              fontWeight: FontWeight.w900,
+                                            ),
+                                          ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
