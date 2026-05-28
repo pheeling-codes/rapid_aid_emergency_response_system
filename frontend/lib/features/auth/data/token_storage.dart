@@ -1,5 +1,6 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
 
 /// Secure wrapper for JWT token persistence.
 /// Access/Refresh tokens → FlutterSecureStorage (encrypted).
@@ -12,15 +13,20 @@ class TokenStorage {
   static const _userIdKey = 'rapid_aid_user_id';
   static const _userNameKey = 'rapid_aid_user_name';
   static const _profileImageKey = 'rapid_aid_profile_image';
+  static const _isOnDutyKey = 'rapid_aid_is_on_duty';
 
   final FlutterSecureStorage _secureStorage;
   final SharedPreferences _prefs;
+
+  final ValueNotifier<String?> profileImageNotifier = ValueNotifier(null);
 
   TokenStorage({
     required FlutterSecureStorage secureStorage,
     required SharedPreferences prefs,
   })  : _secureStorage = secureStorage,
-        _prefs = prefs;
+        _prefs = prefs {
+    profileImageNotifier.value = _prefs.getString(_profileImageKey);
+  }
 
   // ── Token Operations ──────────────────────────────────────
 
@@ -51,7 +57,8 @@ class TokenStorage {
     await _prefs.remove(_userEmailKey);
     await _prefs.remove(_userIdKey);
     await _prefs.remove(_userNameKey);
-    await _prefs.remove('rapid_aid_profile_image');
+    await _prefs.remove(_profileImageKey);
+    await _prefs.remove(_isOnDutyKey);
   }
 
   /// Returns true if an access token exists in storage.
@@ -86,6 +93,7 @@ class TokenStorage {
 
   Future<void> saveProfileImage(String base64Image) async {
     await _prefs.setString(_profileImageKey, base64Image);
+    profileImageNotifier.value = base64Image;
   }
 
   String? getProfileImage() {
@@ -95,4 +103,12 @@ class TokenStorage {
   String? getUserRole() => _prefs.getString(_userRoleKey);
   String? getUserEmail() => _prefs.getString(_userEmailKey);
   String? getUserId() => _prefs.getString(_userIdKey);
+
+  Future<void> saveIsOnDuty(bool isOnDuty) async {
+    await _prefs.setBool(_isOnDutyKey, isOnDuty);
+  }
+
+  bool getIsOnDuty() {
+    return _prefs.getBool(_isOnDutyKey) ?? false;
+  }
 }

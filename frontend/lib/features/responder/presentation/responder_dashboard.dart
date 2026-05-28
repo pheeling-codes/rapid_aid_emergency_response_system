@@ -7,7 +7,9 @@ import '../../../core/widgets/user_profile_avatar.dart';
 import 'critical_incident_popup.dart';
 import '../../../main.dart';
 import '../../../features/auth/data/token_storage.dart';
-
+import '../../../core/network/network_client.dart';
+import 'package:dio/dio.dart';
+import 'package:geolocator/geolocator.dart';
 class ResponderDashboard extends StatefulWidget {
   const ResponderDashboard({super.key});
 
@@ -22,6 +24,9 @@ class _ResponderDashboardState extends State<ResponderDashboard>
   late Animation<double> _pulseAnimation;
   Timer? _dispatchTimer;
   bool _isPopupShowing = false;
+  StreamSubscription<Position>? _positionStream;
+  DateTime? _lastUploadTime;
+  Map<String, dynamic>? _activeIncident;
 
   // Simulated shift timer state
   int _hours = 4, _minutes = 12, _seconds = 5;
@@ -67,26 +72,112 @@ class _ResponderDashboardState extends State<ResponderDashboard>
     _userEmail = ts.getUserEmail() ?? 'Responder';
     _userRole = ts.getUserRole() ?? 'RESPONDER';
     _userName = ts.getUserName() ?? _userEmail.split('@').first;
+    _fetchProfile();
+  }
+
+  Future<void> _fetchProfile() async {
+    try {
+      final dio = getIt<NetworkClient>().dio;
+      final res = await dio.get('/auth/me/');
+      if (mounted) {
+        setState(() {
+          _isOnDuty = res.data['is_available'] ?? false;
+        });
+        if (_isOnDuty) _startTelemetry();
+      }
+    } catch (e) {
+      debugPrint('Profile fetch error: $e');
+    }
+  }
+
+  Future<void> _toggleDuty(bool value) async {
+    setState(() => _isOnDuty = value);
+    try {
+      final dio = getIt<NetworkClient>().dio;
+      await dio.patch('/auth/me/', data: {'is_available': value});
+      if (value) {
+        _startTelemetry();
+      } else {
+        _stopTelemetry();
+      }
+    } catch (e) {
+      debugPrint('Toggle duty error: $e');
+      setState(() => _isOnDuty = !value);
+    }
+  }
+
+  void _startTelemetry() async {
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return;
+
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) return;
+    }
+    if (permission == LocationPermission.deniedForever) return;
+
+    _positionStream?.cancel();
+    _positionStream = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 10,
+      ),
+    ).listen((Position position) {
+      _uploadLocation(position);
+    });
+  }
+
+  void _stopTelemetry() {
+    _positionStream?.cancel();
+    _positionStream = null;
+  }
+
+  void _uploadLocation(Position pos) async {
+    final now = DateTime.now();
+    if (_lastUploadTime != null && now.difference(_lastUploadTime!).inSeconds < 15) return;
+    _lastUploadTime = now;
+    
+    try {
+      final dio = getIt<NetworkClient>().dio;
+      await dio.patch('/auth/location/', data: {
+        'latitude': pos.latitude,
+        'longitude': pos.longitude,
+      });
+    } catch (e) {
+      debugPrint('Location upload error: $e');
+    }
   }
 
   void _scheduleDispatchPopup() {
     _dispatchTimer?.cancel();
-    _dispatchTimer = Timer(const Duration(seconds: 10), () {
-      if (!mounted) return;
-      
-      // Don't show the popup if we've navigated to a sub-page (like Active Emergencies)
-      if (ModalRoute.of(context)?.isCurrent != true) {
-        _scheduleDispatchPopup();
-        return;
+    _dispatchTimer = Timer.periodic(const Duration(seconds: 10), (timer) async {
+      if (!mounted || !_isOnDuty || _activeIncident != null || _isPopupShowing) return;
+
+      try {
+        final dio = getIt<NetworkClient>().dio;
+        final res = await dio.get('/incidents/', queryParameters: {'feed': 'global'});
+        final emergencies = (res.data is List) ? res.data as List : res.data['results'] ?? [];
+        if (emergencies.isEmpty) return;
+
+        final now = DateTime.now();
+        final recentEmergencies = emergencies.where((e) {
+          final createdAt = DateTime.tryParse(e['created_at'] ?? '');
+          if (createdAt == null) return false;
+          // Only show if created within the last 2 minutes
+          return now.difference(createdAt).inMinutes <= 2;
+        }).toList();
+
+        if (recentEmergencies.isEmpty) return;
+
+        if (mounted) {
+          _isPopupShowing = true;
+          await CriticalIncidentPopup.show(context, incident: recentEmergencies.first);
+          if (mounted) _isPopupShowing = false;
+        }
+      } catch (e) {
+        debugPrint('Popup poll error: $e');
       }
-      
-      _isPopupShowing = true;
-      CriticalIncidentPopup.show(context).then((_) {
-        if (!mounted) return;
-        setState(() => _isPopupShowing = false);
-        // Start the 10-second countdown again ONLY after the popup is closed
-        _scheduleDispatchPopup();
-      });
     });
   }
 
@@ -94,6 +185,7 @@ class _ResponderDashboardState extends State<ResponderDashboard>
   void dispose() {
     _pulseController.dispose();
     _dispatchTimer?.cancel();
+    _stopTelemetry();
     super.dispose();
   }
 
@@ -170,7 +262,7 @@ class _ResponderDashboardState extends State<ResponderDashboard>
                     // Active Deployment Toggle
                     _DeploymentToggle(
                       isOnDuty: _isOnDuty,
-                      onChanged: (v) => setState(() => _isOnDuty = v),
+                      onChanged: _toggleDuty,
                       cs: cs,
                       theme: theme,
                     ),

@@ -1,19 +1,25 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../../core/theme/theme.dart';
+import '../../../core/network/network_client.dart';
+import '../../../main.dart';
+import '../../../features/auth/data/token_storage.dart';
+import 'package:go_router/go_router.dart';
 
 /// Critical Incident Popup — centered dialog with blur overlay.
 class CriticalIncidentPopup extends StatefulWidget {
-  const CriticalIncidentPopup({super.key});
+  final Map<String, dynamic> incident;
+  const CriticalIncidentPopup({super.key, required this.incident});
 
-  static Future<void> show(BuildContext context) {
+  static Future<void> show(BuildContext context,
+      {required Map<String, dynamic> incident}) {
     return showGeneralDialog(
       context: context,
       barrierDismissible: false,
       barrierLabel: 'Dismiss',
       barrierColor: Colors.transparent,
       transitionDuration: const Duration(milliseconds: 380),
-      pageBuilder: (ctx, _, __) => const CriticalIncidentPopup(),
+      pageBuilder: (ctx, _, __) => CriticalIncidentPopup(incident: incident),
       transitionBuilder: (_, anim, __, child) {
         return FadeTransition(
           opacity: anim,
@@ -86,8 +92,7 @@ class _CriticalIncidentPopupState extends State<CriticalIncidentPopup>
             ),
           ],
         ),
-        backgroundColor:
-            isAccept ? AppTheme.primary : const Color(0xFF374151),
+        backgroundColor: isAccept ? AppTheme.primary : const Color(0xFF374151),
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -97,10 +102,34 @@ class _CriticalIncidentPopupState extends State<CriticalIncidentPopup>
     Navigator.of(context).pop();
   }
 
+  Future<void> _acceptDispatch() async {
+    try {
+      final dio = getIt<NetworkClient>().dio;
+      final ts = getIt<TokenStorage>();
+      await dio.patch('/incidents/${widget.incident['id']}/', data: {
+        'status': 'EN_ROUTE',
+        'assigned_responder': ts.getUserId(),
+      });
+      if (mounted) {
+        _showToast('Incident accepted — dispatching Unit.', isAccept: true);
+        context.go('/responder/map');
+      }
+    } catch (e) {
+      debugPrint('Accept error: $e');
+      if (mounted) _showToast('Failed to accept incident.', isAccept: false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final size = MediaQuery.of(context).size;
+    final incident = widget.incident;
+
+    final title = incident['title'] ?? 'Emergency';
+    final desc = incident['description'] ?? '';
+    final id = incident['ref_id'] ?? 'RA-UNKNOWN';
+    final category = incident['category'] ?? 'EMERGENCY';
 
     return Material(
       color: Colors.transparent,
@@ -222,7 +251,7 @@ class _CriticalIncidentPopupState extends State<CriticalIncidentPopup>
                                 ),
                                 const Spacer(),
                                 Text(
-                                  'ID #RA-9412',
+                                  'ID #$id',
                                   style: theme.textTheme.labelSmall?.copyWith(
                                     color: const Color(0xFF9CA3AF),
                                     fontWeight: FontWeight.w600,
@@ -235,7 +264,7 @@ class _CriticalIncidentPopupState extends State<CriticalIncidentPopup>
 
                             // Incident Title
                             Text(
-                              'Medical Emergency',
+                              title,
                               style: theme.textTheme.displaySmall?.copyWith(
                                 fontWeight: FontWeight.w900,
                                 color: AppTheme.headingColor,
@@ -247,7 +276,9 @@ class _CriticalIncidentPopupState extends State<CriticalIncidentPopup>
 
                             // Description
                             Text(
-                              '65-year-old male collapsed at Grand Central Station, Platform 4B. Bystander CPR in progress. AED on-site. Heavy crowd — clear path needed urgently.',
+                              desc,
+                              maxLines: 4,
+                              overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: const Color(0xFF6B7280),
                                 height: 1.5,
@@ -261,10 +292,10 @@ class _CriticalIncidentPopupState extends State<CriticalIncidentPopup>
                               children: [
                                 Expanded(
                                   child: _InfoTile(
-                                    label: 'ZONE',
-                                    icon: Icons.location_on_rounded,
+                                    label: 'CATEGORY',
+                                    icon: Icons.warning_rounded,
                                     iconColor: AppTheme.primary,
-                                    value: 'SECTOR 4G',
+                                    value: category,
                                     theme: theme,
                                   ),
                                 ),
@@ -360,14 +391,12 @@ class _CriticalIncidentPopupState extends State<CriticalIncidentPopup>
                                             children: [
                                               Icon(Icons.access_time_rounded,
                                                   size: 13,
-                                                  color:
-                                                      AppTheme.emergencyUrl),
+                                                  color: AppTheme.emergencyUrl),
                                               const SizedBox(width: 6),
                                               Text.rich(
                                                 TextSpan(children: [
                                                   TextSpan(
-                                                    text:
-                                                        'ESTIMATED ARRIVAL: ',
+                                                    text: 'ESTIMATED ARRIVAL: ',
                                                     style: theme
                                                         .textTheme.labelSmall
                                                         ?.copyWith(
@@ -386,8 +415,8 @@ class _CriticalIncidentPopupState extends State<CriticalIncidentPopup>
                                                         ?.copyWith(
                                                       fontWeight:
                                                           FontWeight.w900,
-                                                      color: AppTheme
-                                                          .emergencyUrl,
+                                                      color:
+                                                          AppTheme.emergencyUrl,
                                                       fontSize: 10,
                                                     ),
                                                   ),
@@ -409,10 +438,7 @@ class _CriticalIncidentPopupState extends State<CriticalIncidentPopup>
                               width: double.infinity,
                               height: 54,
                               child: ElevatedButton.icon(
-                                onPressed: () => _showToast(
-                                  'Incident accepted — dispatching Unit 402.',
-                                  isAccept: true,
-                                ),
+                                onPressed: _acceptDispatch,
                                 icon: const Icon(Icons.check_circle_rounded,
                                     color: Colors.white, size: 20),
                                 label: const Text(

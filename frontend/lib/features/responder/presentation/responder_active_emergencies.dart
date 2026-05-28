@@ -1,39 +1,58 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/theme.dart';
+import '../../../core/network/network_client.dart';
+import 'package:dio/dio.dart';
+import '../../../main.dart';
+import '../../auth/data/token_storage.dart';
+import '../../../core/widgets/user_profile_avatar.dart';
 
-class ResponderActiveEmergencies extends StatelessWidget {
+class ResponderActiveEmergencies extends StatefulWidget {
   const ResponderActiveEmergencies({super.key});
 
-  static final List<_EmergencyItem> _emergencies = [
-    _EmergencyItem(
-      category: 'FIRE OUTBREAK',
-      title: 'High-Rise Residential Complex',
-      distance: '0.8km',
-      eta: '04:12 mins',
-      description:
-          'Smoke reported on 14th floor, Tower B. Fire suppression systems active but spreading...',
-      categoryColor: Color(0xFFD32F2F),
-    ),
-    _EmergencyItem(
-      category: 'CARDIAC ARREST',
-      title: 'Public Transit Station',
-      distance: '2.4km',
-      eta: '08:45 mins',
-      description:
-          '65yo Male collapsed on Platform 4. Bystander performing CPR. AED requested at site.',
-      categoryColor: Color(0xFF1565C0),
-    ),
-    _EmergencyItem(
-      category: 'VEHICLE COLLISION',
-      title: 'Interstate 405 Southbound',
-      distance: '5.2km',
-      eta: '12:30 mins',
-      description:
-          'Multi-vehicle pileup. 3 victims reported with head injuries. Heavy traffic delaying backup...',
-      categoryColor: Color(0xFFE65100),
-    ),
-  ];
+  @override
+  State<ResponderActiveEmergencies> createState() =>
+      _ResponderActiveEmergenciesState();
+}
+
+class _ResponderActiveEmergenciesState
+    extends State<ResponderActiveEmergencies> {
+  List<dynamic> _emergencies = [];
+  bool _isLoading = true;
+  bool _hasActiveIncident = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchEmergencies();
+  }
+
+  Future<void> _fetchEmergencies() async {
+    try {
+      final dio = getIt<NetworkClient>().dio;
+      final res =
+          await dio.get('/incidents/', queryParameters: {'feed': 'global'});
+      final activeRes = await dio.get('/incidents/');
+
+      if (mounted) {
+        setState(() {
+          _emergencies =
+              (res.data is List) ? res.data : res.data['results'] ?? [];
+          final myIncidents = (activeRes.data is List)
+              ? activeRes.data as List
+              : activeRes.data['results'] ?? [];
+          _hasActiveIncident = myIncidents.any((inc) =>
+              inc['status'] == 'EN_ROUTE' || inc['status'] == 'ON_SCENE');
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Fetch global feed error: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -83,12 +102,7 @@ class ResponderActiveEmergencies extends StatelessWidget {
                       border:
                           Border.all(color: cs.surfaceContainerHigh, width: 2),
                     ),
-                    child: CircleAvatar(
-                      radius: 16,
-                      backgroundColor: cs.surfaceContainerLow,
-                      child: Icon(Icons.person_rounded,
-                          color: cs.onSurface.withOpacity(0.6), size: 20),
-                    ),
+                    child: const UserProfileAvatar(radius: 16),
                   ),
                 ],
               ),
@@ -141,10 +155,28 @@ class ResponderActiveEmergencies extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
 
-                    // Emergency Cards
-                    ..._emergencies.map(
-                      (e) => _EmergencyCard(item: e, theme: theme, cs: cs),
-                    ),
+                    if (_isLoading)
+                      const Center(child: CircularProgressIndicator())
+                    else if (_emergencies.isEmpty)
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 40.0),
+                          child: Text(
+                            'No active emergencies at this time.',
+                            style:
+                                TextStyle(color: cs.onSurface.withOpacity(0.5)),
+                          ),
+                        ),
+                      )
+                    else
+                      ..._emergencies.map(
+                        (e) => _EmergencyCard(
+                          item: e,
+                          theme: theme,
+                          cs: cs,
+                          isDisabled: _hasActiveIncident,
+                        ),
+                      ),
                     const SizedBox(height: 4),
 
                     // Tactical Map Banner
@@ -161,34 +193,66 @@ class ResponderActiveEmergencies extends StatelessWidget {
   }
 }
 
-class _EmergencyItem {
-  final String category;
-  final String title;
-  final String distance;
-  final String eta;
-  final String description;
-  final Color categoryColor;
-
-  const _EmergencyItem({
-    required this.category,
-    required this.title,
-    required this.distance,
-    required this.eta,
-    required this.description,
-    required this.categoryColor,
-  });
-}
-
-class _EmergencyCard extends StatelessWidget {
-  final _EmergencyItem item;
+class _EmergencyCard extends StatefulWidget {
+  final dynamic item;
   final ThemeData theme;
   final ColorScheme cs;
+  final bool isDisabled;
 
-  const _EmergencyCard(
-      {required this.item, required this.theme, required this.cs});
+  const _EmergencyCard({
+    required this.item,
+    required this.theme,
+    required this.cs,
+    this.isDisabled = false,
+  });
+
+  @override
+  State<_EmergencyCard> createState() => _EmergencyCardState();
+}
+
+class _EmergencyCardState extends State<_EmergencyCard> {
+  bool _isAccepting = false;
+
+  Future<void> _acceptDispatch() async {
+    setState(() => _isAccepting = true);
+    try {
+      final dio = getIt<NetworkClient>().dio;
+      final ts = getIt<TokenStorage>();
+      final userId = ts
+          .getUserId(); // We need to store user ID in TokenStorage, but actually django auth uses JWT user_id implicitly.
+      // Wait, we need the integer ID. We can extract it from the JWT. Or the backend uses request.user!
+      // In IncidentSerializer, `assigned_responder` is a user ID. So we need to pass it.
+      // Wait, if I just send `PATCH` with `{"status": "EN_ROUTE"}` and let the backend handle the assignment?
+      // No, `assigned_responder` must be provided. Let me just use `ts.getUserId()`.
+
+      await dio.patch('/incidents/${widget.item['id']}/', data: {
+        'status': 'EN_ROUTE',
+        'assigned_responder': ts.getUserId(),
+      });
+      if (mounted) {
+        context.go('/responder/map');
+      }
+    } catch (e) {
+      debugPrint('Accept error: $e');
+      if (mounted) setState(() => _isAccepting = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final item = widget.item;
+    final theme = widget.theme;
+    final cs = widget.cs;
+
+    // Parse the item
+    final category = item['category'] ?? 'EMERGENCY';
+    final title = item['title'] ?? 'Emergency';
+    final address = item['address'] ?? 'Unknown location';
+    final desc = item['description'] ?? '';
+    final createdAt = item['created_at'];
+    final timeAgo = createdAt != null
+        ? '${DateTime.now().difference(DateTime.parse(createdAt)).inMinutes}m ago'
+        : '';
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(18),
@@ -210,9 +274,9 @@ class _EmergencyCard extends StatelessWidget {
           Row(
             children: [
               Text(
-                item.category,
+                category,
                 style: theme.textTheme.labelSmall?.copyWith(
-                  color: item.categoryColor,
+                  color: AppTheme.emergencyUrl,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 1.0,
                   fontSize: 11,
@@ -233,7 +297,7 @@ class _EmergencyCard extends StatelessWidget {
 
           // Title
           Text(
-            item.title,
+            title,
             style: theme.textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.w800,
               fontSize: 18,
@@ -247,14 +311,16 @@ class _EmergencyCard extends StatelessWidget {
             children: [
               _InfoBadge(
                 icon: Icons.navigation_rounded,
-                text: item.distance,
+                text: address.length > 20
+                    ? '${address.substring(0, 20)}...'
+                    : address,
                 theme: theme,
                 cs: cs,
               ),
               const SizedBox(width: 12),
               _InfoBadge(
                 icon: Icons.timer_rounded,
-                text: item.eta,
+                text: timeAgo,
                 theme: theme,
                 cs: cs,
                 iconColor: const Color(0xFFD32F2F),
@@ -265,7 +331,7 @@ class _EmergencyCard extends StatelessWidget {
 
           // Description
           Text(
-            item.description,
+            desc,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: theme.textTheme.bodySmall?.copyWith(
@@ -280,7 +346,9 @@ class _EmergencyCard extends StatelessWidget {
             children: [
               Expanded(
                 child: ElevatedButton(
-                  onPressed: () {},
+                  onPressed: (widget.isDisabled || _isAccepting)
+                      ? null
+                      : _acceptDispatch,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: cs.primary,
                     foregroundColor: Colors.white,
@@ -289,13 +357,21 @@ class _EmergencyCard extends StatelessWidget {
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
                   ),
-                  child: Text(
-                    'Accept Dispatch',
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+                  child: _isAccepting
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2))
+                      : Text(
+                          'Accept Dispatch',
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: widget.isDisabled
+                                ? cs.onSurface.withOpacity(0.5)
+                                : Colors.white,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(width: 10),

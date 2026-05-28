@@ -46,6 +46,7 @@ class Incident(models.Model):
         PENDING = 'PENDING', 'Pending'
         ASSIGNED = 'ASSIGNED', 'Assigned'
         EN_ROUTE = 'EN_ROUTE', 'En Route'
+        ON_SCENE = 'ON_SCENE', 'On Scene'
         RESOLVED = 'RESOLVED', 'Resolved'
         CANCELLED = 'CANCELLED', 'Cancelled'
 

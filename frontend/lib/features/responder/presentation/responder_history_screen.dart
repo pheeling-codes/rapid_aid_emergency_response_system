@@ -6,6 +6,7 @@ import 'responder_incident_detail.dart';
 import '../../../main.dart';
 import '../../../core/network/network_client.dart';
 import '../../../core/widgets/premium_empty_state.dart';
+import '../../../core/widgets/user_profile_avatar.dart';
 
 class ResponderHistoryScreen extends StatefulWidget {
   const ResponderHistoryScreen({super.key});
@@ -19,6 +20,7 @@ class _ResponderHistoryScreenState extends State<ResponderHistoryScreen> {
   List<_IncidentRecord> _incidents = [];
   bool _isLoading = true;
   String _errorMessage = '';
+  String _totalResolved = '0';
 
   final List<String> _filters = [
     'All Incidents',
@@ -58,6 +60,11 @@ class _ResponderHistoryScreenState extends State<ResponderHistoryScreen> {
             status: json['status'] ?? 'PENDING',
           );
         }).toList();
+
+        final resolvedCount =
+            _incidents.where((i) => i.status == 'RESOLVED').length;
+        _totalResolved = resolvedCount.toString();
+
         _isLoading = false;
       });
     } catch (e) {
@@ -68,35 +75,51 @@ class _ResponderHistoryScreenState extends State<ResponderHistoryScreen> {
     }
   }
 
-  String _capitalize(String s) => s.isNotEmpty ? s[0].toUpperCase() + s.substring(1).toLowerCase() : '';
+  String _capitalize(String s) =>
+      s.isNotEmpty ? s[0].toUpperCase() + s.substring(1).toLowerCase() : '';
 
   IconData _getCategoryIcon(String type) {
     switch (type.toLowerCase()) {
-      case 'medical': return Icons.medical_services_rounded;
-      case 'fire': return Icons.local_fire_department_rounded;
-      case 'accident': return Icons.car_crash;
-      case 'security': return Icons.security_rounded;
-      default: return Icons.emergency;
+      case 'medical':
+        return Icons.medical_services_rounded;
+      case 'fire':
+        return Icons.local_fire_department_rounded;
+      case 'accident':
+        return Icons.car_crash;
+      case 'security':
+        return Icons.security_rounded;
+      default:
+        return Icons.emergency;
     }
   }
 
   Color _getCategoryColor(String type) {
     switch (type.toLowerCase()) {
-      case 'medical': return const Color(0xFFD32F2F);
-      case 'fire': return const Color(0xFFE65100);
-      case 'accident': return const Color(0xFF1565C0);
-      case 'security': return const Color(0xFF2E7D32);
-      default: return Colors.grey.shade700;
+      case 'medical':
+        return const Color(0xFFD32F2F);
+      case 'fire':
+        return const Color(0xFFE65100);
+      case 'accident':
+        return const Color(0xFF1565C0);
+      case 'security':
+        return const Color(0xFF2E7D32);
+      default:
+        return Colors.grey.shade700;
     }
   }
 
   Color _getCategoryBg(String type) {
     switch (type.toLowerCase()) {
-      case 'medical': return const Color(0xFFFFEBEE);
-      case 'fire': return const Color(0xFFFFF3E0);
-      case 'accident': return const Color(0xFFE3F2FD);
-      case 'security': return const Color(0xFFE8F5E9);
-      default: return Colors.grey.shade200;
+      case 'medical':
+        return const Color(0xFFFFEBEE);
+      case 'fire':
+        return const Color(0xFFFFF3E0);
+      case 'accident':
+        return const Color(0xFFE3F2FD);
+      case 'security':
+        return const Color(0xFFE8F5E9);
+      default:
+        return Colors.grey.shade200;
     }
   }
 
@@ -114,7 +137,10 @@ class _ResponderHistoryScreenState extends State<ResponderHistoryScreen> {
     if (_selectedFilter == 0) return _incidents;
     final label = _filters[_selectedFilter];
     return _incidents
-        .where((i) => i.category.toLowerCase() == label.toLowerCase() || (label.toLowerCase() == 'accidents' && i.category.toLowerCase() == 'accident'))
+        .where((i) =>
+            i.category.toLowerCase() == label.toLowerCase() ||
+            (label.toLowerCase() == 'accidents' &&
+                i.category.toLowerCase() == 'accident'))
         .toList();
   }
 
@@ -133,8 +159,8 @@ class _ResponderHistoryScreenState extends State<ResponderHistoryScreen> {
             // ── Topbar ─────────────────────────────────────────────────────
             Container(
               color: Colors.white,
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 20.0, vertical: 14.0),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 20.0, vertical: 14.0),
               child: Row(
                 children: [
                   const RapidAidLogo(size: 32, iconSize: 18),
@@ -157,12 +183,7 @@ class _ResponderHistoryScreenState extends State<ResponderHistoryScreen> {
                       border:
                           Border.all(color: cs.surfaceContainerHigh, width: 2),
                     ),
-                    child: CircleAvatar(
-                      radius: 16,
-                      backgroundColor: cs.surfaceContainerLow,
-                      child: Icon(Icons.person_rounded,
-                          color: cs.onSurface.withOpacity(0.6), size: 20),
-                    ),
+                    child: const UserProfileAvatar(radius: 16),
                   ),
                 ],
               ),
@@ -180,9 +201,9 @@ class _ResponderHistoryScreenState extends State<ResponderHistoryScreen> {
                       children: [
                         Expanded(
                           child: _SummaryCard(
-                            label: 'TOTAL RESOLVED',
-                            value: '24',
-                            badge: '+2 today',
+                            label: 'TOTAL ASSIGNED',
+                            value: '${_incidents.length}',
+                            badge: '$_totalResolved Resolved',
                             badgeColor: const Color(0xFF4CAF50),
                             theme: theme,
                             cs: cs,
@@ -269,7 +290,8 @@ class _ResponderHistoryScreenState extends State<ResponderHistoryScreen> {
                       PremiumEmptyState(
                         icon: Icons.history,
                         title: 'No Incidents',
-                        message: 'There are no incidents matching this category.',
+                        message:
+                            'There are no incidents matching this category.',
                         actionLabel: 'Refresh',
                         onAction: _fetchHistory,
                       )

@@ -4,9 +4,14 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
+import 'dart:convert';
+import 'package:dio/dio.dart';
 
 import '../../../core/theme/theme.dart';
 import '../../../core/widgets/rapid_aid_logo.dart';
+import '../../../core/network/network_client.dart';
+import '../../../main.dart';
+import '../../auth/data/token_storage.dart';
 import '../../auth/logic/auth_bloc.dart';
 import '../../auth/logic/auth_event.dart';
 
@@ -20,9 +25,133 @@ class ResponderProfileScreen extends StatefulWidget {
 }
 
 class _ResponderProfileScreenState extends State<ResponderProfileScreen> {
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+
   bool _isOnDuty = true;
   bool _isDarkMode = false;
   String? _profileImageUrl;
+  bool _isLoading = true;
+  bool _isSaving = false;
+
+  String _totalResponses = '0';
+  String _totalDutyHours = '0';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfileSync();
+    _fetchProfileStats();
+  }
+
+  void _loadProfileSync() {
+    final ts = getIt<TokenStorage>();
+    final name = ts.getUserName();
+    final email = ts.getUserEmail();
+    final img = ts.getProfileImage();
+    if (name != null && name.isNotEmpty) _nameController.text = name;
+    if (email != null && email.isNotEmpty) _emailController.text = email;
+    if (img != null && img.isNotEmpty) _profileImageUrl = img;
+    _isOnDuty = ts.getIsOnDuty();
+  }
+
+  Future<void> _fetchProfileStats() async {
+    try {
+      final dio = getIt<NetworkClient>().dio;
+      final res = await dio.get('/incidents/');
+      final dataList = (res.data is List)
+          ? res.data as List
+          : res.data['results'] as List? ?? [];
+
+      if (mounted) {
+        setState(() {
+          _totalResponses = dataList
+              .where((i) => i['status'] == 'RESOLVED')
+              .length
+              .toString();
+          // Mock duty hours based on responses
+          _totalDutyHours = (dataList.length * 3).toString();
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Failed to load stats: $e');
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _updateProfile() async {
+    setState(() => _isSaving = true);
+    try {
+      final dio = getIt<NetworkClient>().dio;
+      final parts = _nameController.text.trim().split(' ');
+      final firstName = parts.isNotEmpty ? parts.first : '';
+      final lastName = parts.length > 1 ? parts.sublist(1).join(' ') : '';
+
+      final Map<String, dynamic> data = {
+        'first_name': firstName,
+        'last_name': lastName,
+      };
+
+      if (_profileImageUrl != null && _profileImageUrl!.startsWith('data:')) {
+        data['profile_image'] = _profileImageUrl;
+      }
+
+      final response = await dio.patch('/auth/me/', data: data);
+      final ts = getIt<TokenStorage>();
+      final newName =
+          "${response.data['first_name'] ?? ''} ${response.data['last_name'] ?? ''}"
+              .trim();
+      if (newName.isNotEmpty) {
+        await ts.saveUserName(newName);
+      }
+      if (response.data['profile_image'] != null) {
+        await ts.saveProfileImage(response.data['profile_image']);
+        _profileImageUrl = response.data['profile_image'];
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Profile updated successfully'),
+              backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Failed to update profile'),
+              backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  Future<void> _toggleDuty(bool value) async {
+    setState(() => _isOnDuty = value);
+    getIt<TokenStorage>().saveIsOnDuty(value);
+    try {
+      final dio = getIt<NetworkClient>().dio;
+      await dio.patch('/auth/me/', data: {'is_available': value});
+    } catch (e) {
+      debugPrint('Duty toggle error: $e');
+      // Revert on failure
+      if (mounted) {
+        setState(() => _isOnDuty = !value);
+        getIt<TokenStorage>().saveIsOnDuty(!value);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    super.dispose();
+  }
 
   void _pickAvatar() {
     if (kIsWeb) {
@@ -32,8 +161,12 @@ class _ResponderProfileScreenState extends State<ResponderProfileScreen> {
       input.onChange.listen((e) {
         final files = input.files;
         if (files != null && files.isNotEmpty) {
-          final url = html.Url.createObjectUrlFromBlob(files[0]);
-          if (mounted) setState(() => _profileImageUrl = url);
+          final reader = html.FileReader();
+          reader.readAsDataUrl(files[0]);
+          reader.onLoadEnd.listen((_) {
+            final base64str = reader.result as String;
+            if (mounted) setState(() => _profileImageUrl = base64str);
+          });
         }
       });
     }
@@ -235,20 +368,70 @@ class _ResponderProfileScreenState extends State<ResponderProfileScreen> {
                     // Avatar + Identity
                     _AvatarSection(
                       profileImageUrl: _profileImageUrl,
+                      name: _nameController.text.isNotEmpty
+                          ? _nameController.text
+                          : 'Unit 402',
                       onTap: _pickAvatar,
                       theme: theme,
                       cs: cs,
                     ),
+                    const SizedBox(height: 24),
+
+                    // Profile Edit Fields
+                    _ProfileTextField(
+                      label: 'Full Name',
+                      controller: _nameController,
+                    ),
+                    const SizedBox(height: 16),
+                    _ProfileTextField(
+                      label: 'Email Address',
+                      controller: _emailController,
+                      enabled: false,
+                    ),
                     const SizedBox(height: 20),
 
+                    // Save Changes Button
+                    SizedBox(
+                      height: 50,
+                      child: ElevatedButton(
+                        onPressed:
+                            _isLoading || _isSaving ? null : _updateProfile,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF004F9F),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14)),
+                          elevation: 0,
+                        ),
+                        child: _isSaving
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                    color: Colors.white, strokeWidth: 2))
+                            : Text(
+                                'Save Profile',
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700),
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
                     // Stats Banner
-                    _StatsBanner(theme: theme),
+                    _StatsBanner(
+                      theme: theme,
+                      totalResponses: _totalResponses,
+                      totalDutyHours: _totalDutyHours,
+                    ),
                     const SizedBox(height: 16),
 
                     // Active Duty Toggle
                     _DutyToggleCard(
                       isOnDuty: _isOnDuty,
-                      onChanged: (v) => setState(() => _isOnDuty = v),
+                      onChanged: (v) {
+                        _toggleDuty(v);
+                      },
                       theme: theme,
                       cs: cs,
                     ),
@@ -319,12 +502,14 @@ class _ResponderProfileScreenState extends State<ResponderProfileScreen> {
 
 class _AvatarSection extends StatelessWidget {
   final String? profileImageUrl;
+  final String name;
   final VoidCallback onTap;
   final ThemeData theme;
   final ColorScheme cs;
 
   const _AvatarSection({
     required this.profileImageUrl,
+    required this.name,
     required this.onTap,
     required this.theme,
     required this.cs,
@@ -379,53 +564,6 @@ class _AvatarSection extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 14),
-
-        // Name
-        Text(
-          'Unit 402',
-          style: theme.textTheme.headlineMedium?.copyWith(
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-            color: AppTheme.headingColor,
-          ),
-        ),
-        const SizedBox(height: 6),
-
-        // Rank badge
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-          decoration: BoxDecoration(
-            color: AppTheme.primary.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Text(
-            'RESPONDER RANK II',
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: AppTheme.primary,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.0,
-              fontSize: 11,
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-
-        // Verified phone
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.verified_rounded, size: 14, color: AppTheme.primary),
-            const SizedBox(width: 6),
-            Text(
-              '+234 812 345 6789',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: AppTheme.headingColor.withOpacity(0.6),
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
       ],
     );
   }
@@ -433,7 +571,14 @@ class _AvatarSection extends StatelessWidget {
 
 class _StatsBanner extends StatelessWidget {
   final ThemeData theme;
-  const _StatsBanner({required this.theme});
+  final String totalResponses;
+  final String totalDutyHours;
+
+  const _StatsBanner({
+    required this.theme,
+    required this.totalResponses,
+    required this.totalDutyHours,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -471,7 +616,7 @@ class _StatsBanner extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '24',
+                  totalResponses,
                   style: theme.textTheme.headlineMedium?.copyWith(
                     fontSize: 34,
                     fontWeight: FontWeight.w900,
@@ -526,7 +671,7 @@ class _StatsBanner extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      '250',
+                      totalDutyHours,
                       style: theme.textTheme.headlineMedium?.copyWith(
                         fontSize: 30,
                         fontWeight: FontWeight.w900,
@@ -863,6 +1008,70 @@ class _OutlineActionButton extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ProfileTextField extends StatelessWidget {
+  final String label;
+  final TextEditingController controller;
+  final bool enabled;
+
+  const _ProfileTextField({
+    required this.label,
+    required this.controller,
+    this.enabled = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: theme.textTheme.labelMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+            color: cs.onSurface.withOpacity(0.6),
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          enabled: enabled,
+          style: theme.textTheme.bodyLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+            color:
+                enabled ? AppTheme.headingColor : cs.onSurface.withOpacity(0.4),
+          ),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: enabled ? Colors.white : const Color(0xFFF3F4F6),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: cs.onSurface.withOpacity(0.1)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: cs.onSurface.withOpacity(0.1)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFF004F9F), width: 2),
+            ),
+            disabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: cs.onSurface.withOpacity(0.05)),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

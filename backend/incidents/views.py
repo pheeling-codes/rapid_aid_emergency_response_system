@@ -27,10 +27,14 @@ class IncidentListView(generics.ListAPIView):
     def get_queryset(self):
         print(f"DEBUG: IncidentListView.get_queryset() called by {self.request.user}")
         user = self.request.user
+        feed_type = self.request.query_params.get('feed')
         queryset = Incident.objects.select_related('reporter', 'assigned_responder')
+        
         if user.is_dispatcher or user.is_staff:
             return queryset.all()
         elif user.is_responder:
+            if feed_type == 'global':
+                return queryset.filter(status=Incident.Status.PENDING)
             return queryset.filter(assigned_responder=user)
         else:
             return queryset.filter(reporter=user)
