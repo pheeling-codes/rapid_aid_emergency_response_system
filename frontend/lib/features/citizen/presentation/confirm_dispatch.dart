@@ -7,6 +7,7 @@ import '../../../main.dart';
 import '../../../core/network/network_client.dart';
 import '../../../core/theme/theme.dart';
 import '../../../core/widgets/ambient_shadow.dart';
+import '../../../core/widgets/user_profile_avatar.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -253,12 +254,7 @@ class _ConfirmDispatchState extends State<ConfirmDispatch> {
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white, width: 2),
                     ),
-                    child: CircleAvatar(
-                      radius: 16,
-                      backgroundColor: cs.surfaceContainerLow,
-                      child: Icon(Icons.person,
-                          color: cs.onSurface.withOpacity(0.7), size: 20),
-                    ),
+                    child: const UserProfileAvatar(radius: 16),
                   ),
                 ],
               ),

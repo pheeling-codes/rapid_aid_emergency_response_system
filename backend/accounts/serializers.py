@@ -47,6 +47,14 @@ class UserRegistrationSerializer(SanitizeMixin, serializers.ModelSerializer):
         if value != value.lower():
             raise ValidationError("Email must be in strictly lowercase letters.")
         validate_email(value)
+        
+        # Check BlacklistedEmail
+        from django.utils import timezone
+        from accounts.models import BlacklistedEmail
+        blacklist_entry = BlacklistedEmail.objects.filter(email=value).first()
+        if blacklist_entry and blacklist_entry.locked_until > timezone.now():
+            raise ValidationError("This account has been deleted by an admin.")
+            
         return value
 
     password = serializers.CharField(write_only=True, min_length=8, trim_whitespace=False)
@@ -102,6 +110,13 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             if username_clean != username_clean.lower():
                 raise ValidationError({self.username_field: "Email must be in strictly lowercase letters."})
             attrs[self.username_field] = username_clean
+            
+            # Check BlacklistedEmail before standard auth
+            from django.utils import timezone
+            from accounts.models import BlacklistedEmail
+            blacklist_entry = BlacklistedEmail.objects.filter(email=username_clean).first()
+            if blacklist_entry and blacklist_entry.locked_until > timezone.now():
+                raise ValidationError({"detail": "This account has been deleted by an admin."})
 
         data = super().validate(attrs)
 

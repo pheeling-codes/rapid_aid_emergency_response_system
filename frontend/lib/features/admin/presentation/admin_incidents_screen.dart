@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/theme.dart';
+import '../../../core/widgets/status_chip.dart';
+import '../../../core/network/network_client.dart';
+import '../../../main.dart';
+import '../../../core/widgets/user_profile_avatar.dart';
 
 class AdminIncidentsScreen extends StatefulWidget {
   const AdminIncidentsScreen({super.key});
@@ -11,55 +15,96 @@ class AdminIncidentsScreen extends StatefulWidget {
 class _AdminIncidentsScreenState extends State<AdminIncidentsScreen> {
   String _selectedCategory = 'All Categories';
   String _selectedStatus = 'All Statuses';
-  String _selectedTime = 'Last 24 Hours';
+  String _selectedTime = 'All Time';
   Map<String, dynamic>? _selectedIncident; // For the right panel
 
-  final List<Map<String, dynamic>> _incidents = [
-    {
-      'id': 'INC-2026-0892',
-      'type': 'MEDICAL',
-      'title': 'Cardiac Arrest',
-      'location': '402 W 51st St',
-      'status': 'RESOLVED',
-      'time': '12:42 PM',
-      'unit': 'Unit 7A (ALS)',
-      'response': '4.1 min',
-      'details': 'Patient revived after 2 rounds of CPR and 1 shock from AED. Transported to Mt Sinai.',
-    },
-    {
-      'id': 'INC-2026-0891',
-      'type': 'FIRE',
-      'title': 'Building Fire',
-      'location': '128 8th Ave',
-      'status': 'ACTIVE',
-      'time': '12:30 PM',
-      'unit': 'Unit 12B (BLS)',
-      'response': 'Pending',
-      'details': 'Patient struggling to breathe, history of severe asthma. Unit en route.',
-    },
-    {
-      'id': 'INC-2026-0890',
-      'type': 'ACCIDENT',
-      'title': 'Vehicle Collision',
-      'location': 'Broadway & 42nd St',
-      'status': 'RESOLVED',
-      'time': '11:15 AM',
-      'unit': 'Rapid Response 4',
-      'response': '5.2 min',
-      'details': 'Minor lacerations and suspected concussion. Immobilized and transported to Bellevue.',
-    },
-    {
-      'id': 'INC-2026-0889',
-      'type': 'SECURITY',
-      'title': 'Intrusion Alarm',
-      'location': 'Metropolitan Hospital',
-      'status': 'RESOLVED',
-      'time': '09:00 AM',
-      'unit': 'Unit 3C (Transport)',
-      'response': 'N/A',
-      'details': 'Scheduled transfer to rehabilitation facility.',
-    },
-  ];
+  bool _isLoading = true;
+  List<Map<String, dynamic>> _incidents = [];
+
+  int _totalResolved = 0;
+  String _avgResponseTime = '0m';
+  String _successRate = '0%';
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchIncidents();
+  }
+
+  Future<void> _fetchIncidents() async {
+    try {
+      final res = await getIt<NetworkClient>().dio.get('/incidents/');
+      if (mounted) {
+        final List<dynamic> results = res.data is List ? res.data : (res.data['results'] ?? []);
+        
+        int resolvedCount = 0;
+        int totalResponseSecs = 0;
+        int validResponseCount = 0;
+
+        final mapped = results.map((inc) {
+          final isResolved = inc['status'] == 'RESOLVED';
+          if (isResolved) resolvedCount++;
+
+          String responseTime = 'Pending';
+          if (inc['created_at'] != null && inc['resolved_at'] != null) {
+            final created = DateTime.parse(inc['created_at']);
+            final resolved = DateTime.parse(inc['resolved_at']);
+            final diff = resolved.difference(created);
+            responseTime = '${diff.inMinutes} min';
+            totalResponseSecs += diff.inSeconds;
+            validResponseCount++;
+          } else if (inc['status'] == 'EN_ROUTE' || inc['status'] == 'ON_SCENE') {
+             responseTime = 'In Progress';
+          }
+
+          return {
+            'id': inc['ref_id'] ?? inc['id'].toString(),
+            'type': inc['category']?.toString().toUpperCase() ?? 'OTHER',
+            'title': inc['title'] ?? 'Incident',
+            'location': inc['address'] ?? 'Unknown Location',
+            'status': inc['status'] ?? 'PENDING',
+            'time': _formatTime(inc['created_at']),
+            'unit': inc['responder_name'] ?? 'Unassigned',
+            'response': responseTime,
+            'details': inc['description'] ?? 'No details provided.',
+          };
+        }).toList();
+
+        setState(() {
+          _incidents = mapped;
+          _totalResolved = resolvedCount;
+          
+          if (validResponseCount > 0) {
+            final avgSecs = totalResponseSecs / validResponseCount;
+            _avgResponseTime = '${(avgSecs / 60).toStringAsFixed(1)}m';
+          }
+          
+          if (_incidents.isNotEmpty) {
+            _successRate = '${((resolvedCount / _incidents.length) * 100).toStringAsFixed(1)}%';
+          }
+          
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  String _formatTime(String? dateStr) {
+    if (dateStr == null) return 'Unknown';
+    try {
+      final dt = DateTime.parse(dateStr).toLocal();
+      int hour = dt.hour;
+      final min = dt.minute.toString().padLeft(2, '0');
+      final period = hour >= 12 ? 'PM' : 'AM';
+      if (hour > 12) hour -= 12;
+      if (hour == 0) hour = 12;
+      return '$hour:$min $period';
+    } catch (e) {
+      return 'Unknown';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -130,11 +175,7 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen> {
                           shape: BoxShape.circle,
                           border: Border.all(color: cs.onSurface.withOpacity(0.1), width: 2),
                         ),
-                        child: CircleAvatar(
-                          radius: 16,
-                          backgroundColor: cs.surfaceContainerLow,
-                          child: Icon(Icons.person, color: cs.onSurface.withOpacity(0.7), size: 20),
-                        ),
+                        child: const UserProfileAvatar(radius: 16),
                       ),
                     ],
                   ),
@@ -150,11 +191,11 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen> {
                         // Analytics Header
                         Row(
                           children: [
-                            Expanded(child: _AnalyticCard(title: 'TOTAL RESOLVED (24H)', value: '142', trend: '+12%', isPositive: true)),
+                            Expanded(child: _AnalyticCard(title: 'TOTAL RESOLVED', value: '$_totalResolved', trend: '-', isPositive: true)),
                             const SizedBox(width: 24),
-                            Expanded(child: _AnalyticCard(title: 'AVG RESPONSE TIME', value: '4.2m', trend: '-0.4m', isPositive: true)),
+                            Expanded(child: _AnalyticCard(title: 'AVG RESPONSE TIME', value: _avgResponseTime, trend: '-', isPositive: true)),
                             const SizedBox(width: 24),
-                            Expanded(child: _AnalyticCard(title: 'SUCCESS RATE', value: '98.5%', trend: '+1.2%', isPositive: true)),
+                            Expanded(child: _AnalyticCard(title: 'RESOLUTION RATE', value: _successRate, trend: '-', isPositive: true)),
                           ],
                         ),
                         const SizedBox(height: 40),
@@ -203,11 +244,13 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen> {
                                       icon: Icon(Icons.keyboard_arrow_down, color: AppTheme.headingColor, size: 18),
                                       isDense: true,
                                       style: TextStyle(color: AppTheme.headingColor, fontWeight: FontWeight.w700),
-                                      items: ['All Statuses', 'Active', 'Resolved', 'Cancelled'].map((String value) {
+                                      items: ['All Statuses', 'Pending', 'En Route', 'On Scene', 'Resolved', 'Cancelled'].map((String value) {
                                         return DropdownMenuItem<String>(value: value, child: Text(value));
                                       }).toList(),
                                       onChanged: (val) {
-                                        if (val != null) setState(() => _selectedStatus = val);
+                                        if (val != null) setState(() {
+                                          _selectedStatus = val == 'All Statuses' ? val : val.toUpperCase().replaceAll(' ', '_');
+                                        });
                                       },
                                     ),
                                   ),

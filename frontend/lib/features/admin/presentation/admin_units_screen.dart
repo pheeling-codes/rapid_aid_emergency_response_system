@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:animations/animations.dart';
+import '../../../main.dart';
+import '../../../core/network/network_client.dart';
 import '../../../core/theme/theme.dart';
+import '../../../core/widgets/user_profile_avatar.dart';
 
 class AdminUnitsScreen extends StatefulWidget {
   const AdminUnitsScreen({super.key});
@@ -85,12 +89,7 @@ class _AdminUnitsScreenState extends State<AdminUnitsScreen>
                     border: Border.all(
                         color: cs.onSurface.withOpacity(0.1), width: 2),
                   ),
-                  child: CircleAvatar(
-                    radius: 16,
-                    backgroundColor: cs.surfaceContainerLow,
-                    child: Icon(Icons.person,
-                        color: cs.onSurface.withOpacity(0.7), size: 20),
-                  ),
+                  child: const UserProfileAvatar(radius: 16),
                 ),
               ],
             ),
@@ -128,12 +127,23 @@ class _AdminUnitsScreenState extends State<AdminUnitsScreen>
 
           // ── Tab Views ─────────────────────────────────────────────────────
           Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _ResponderManagementView(),
-                _UserDirectoryView(),
-              ],
+            child: AnimatedBuilder(
+              animation: _tabController,
+              builder: (context, child) {
+                return PageTransitionSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  transitionBuilder: (child, animation, secondaryAnimation) {
+                    return FadeThroughTransition(
+                      animation: animation,
+                      secondaryAnimation: secondaryAnimation,
+                      child: child,
+                    );
+                  },
+                  child: _tabController.index == 0
+                      ? _ResponderManagementView(key: const ValueKey('responder'))
+                      : _UserDirectoryView(key: const ValueKey('citizen')),
+                );
+              },
             ),
           ),
         ],
@@ -145,6 +155,8 @@ class _AdminUnitsScreenState extends State<AdminUnitsScreen>
 // ── Responder Management Tab ──────────────────────────────────────────────────
 
 class _ResponderManagementView extends StatefulWidget {
+  const _ResponderManagementView({super.key});
+
   @override
   State<_ResponderManagementView> createState() =>
       _ResponderManagementViewState();
@@ -153,52 +165,78 @@ class _ResponderManagementView extends StatefulWidget {
 class _ResponderManagementViewState extends State<_ResponderManagementView> {
   String _selectedFilter = 'All';
   int? _editingIndex;
-  late TextEditingController _roleController;
+  late TextEditingController _firstController;
+  late TextEditingController _lastController;
 
-  List<Map<String, dynamic>> _responders = [
-    {
-      'name': 'Lt. Sarah Jenkins',
-      'role': 'Senior Paramedic',
-      'unitId': 'MED-X-902',
-      'status': 'ON DUTY',
-      'location': '402 W 51st St (Moving)',
-      'dateJoined': 'Oct 12, 2024',
-    },
-    {
-      'name': 'Sgt. David Chen',
-      'role': 'Tactical Response',
-      'unitId': 'TAC-S-441',
-      'status': 'OFF DUTY',
-      'location': 'HQ Base 4',
-      'dateJoined': 'Nov 05, 2024',
-    },
-    {
-      'name': 'Cpt. Elena Rodriguez',
-      'role': 'Field Commander',
-      'unitId': 'CMD-V-001',
-      'status': 'SUSPENDED',
-      'location': 'Offline',
-      'dateJoined': 'Dec 22, 2023',
-    },
-    {
-      'name': 'Officer James Miller',
-      'role': 'Support Unit',
-      'unitId': 'SUP-M-112',
-      'status': 'ON DUTY',
-      'location': '128 8th Ave (Stationary)',
-      'dateJoined': 'Jan 15, 2025',
-    },
-  ];
+  bool _isLoading = true;
+  List<Map<String, dynamic>> _responders = [];
+  int _totalResponders = 0;
+  int _onDutyCount = 0;
+  int _offDutyCount = 0;
 
   @override
   void initState() {
     super.initState();
-    _roleController = TextEditingController();
+    _firstController = TextEditingController();
+    _lastController = TextEditingController();
+    _fetchResponders();
+  }
+
+  Future<void> _fetchResponders() async {
+    try {
+      final res = await getIt<NetworkClient>().dio.get('/dispatcher/users/');
+      final List<dynamic> results = res.data is List ? res.data : (res.data['results'] ?? []);
+      setState(() {
+        _responders = results
+            .where((r) => r['role'] == 'RESPONDER')
+            .map((r) {
+              String statusStr = 'SUSPENDED';
+              if (!r['is_active']) {
+                statusStr = 'DELETED';
+              } else if (!r['is_suspended']) {
+                statusStr = r['is_available'] ? 'ON DUTY' : 'OFF DUTY';
+              }
+              
+              return {
+                'id': r['id'],
+                'first_name': r['first_name'] ?? '',
+                'last_name': r['last_name'] ?? '',
+                'name': r['name'] ?? 'Unknown',
+                'role': 'Responder',
+                'unitId': 'U-${r['id'].toString().padLeft(4, '0')}',
+                'status': statusStr,
+                'location': 'Tracking Active',
+                'dateJoined': _formatDate(r['date_joined']),
+                'is_active': r['is_active'],
+                'is_suspended': r['is_suspended'],
+              };
+            }).toList();
+        
+        _totalResponders = _responders.length;
+        _onDutyCount = _responders.where((r) => r['status'] == 'ON DUTY').length;
+        _offDutyCount = _responders.where((r) => r['status'] == 'OFF DUTY').length;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  String _formatDate(String? dateStr) {
+    if (dateStr == null) return 'Unknown';
+    try {
+      final dt = DateTime.parse(dateStr).toLocal();
+      final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
+    } catch (e) {
+      return 'Unknown';
+    }
   }
 
   @override
   void dispose() {
-    _roleController.dispose();
+    _firstController.dispose();
+    _lastController.dispose();
     super.dispose();
   }
 
@@ -254,22 +292,19 @@ class _ResponderManagementViewState extends State<_ResponderManagementView> {
 
     final filteredResponders = _responders.where((r) {
       if (_selectedFilter == 'All') return true;
-      if (_selectedFilter == 'Dormant')
-        return r['status'] ==
-            'SUSPENDED'; // Mapping dormant to suspended for now
+      if (_selectedFilter == 'Deleted') return r['status'] == 'DELETED';
       return r['status'] == _selectedFilter.toUpperCase();
     }).toList();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(
-          horizontal: 32, vertical: 16), // Reduced top space
+          horizontal: 32, vertical: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // ── Top KPI Section (Horizontal Layout) ─────────────────────────────
           Row(
             children: [
-              // Main Responder Status Card
               Expanded(
                 flex: 4,
                 child: Container(
@@ -308,12 +343,12 @@ class _ResponderManagementViewState extends State<_ResponderManagementView> {
                       Row(
                         children: [
                           _StatusStat(
-                              '42', 'TOTAL UNITS', AppTheme.headingColor),
+                              '$_totalResponders', 'TOTAL UNITS', AppTheme.headingColor),
                           const SizedBox(width: 32),
-                          _StatusStat('28', 'ON DUTY', const Color(0xFF10B981)),
+                          _StatusStat('$_onDutyCount', 'ON DUTY', const Color(0xFF10B981)),
                           const SizedBox(width: 32),
                           _StatusStat(
-                              '14', 'OFF DUTY', const Color(0xFF6B7280)),
+                              '$_offDutyCount', 'OFF DUTY', const Color(0xFF6B7280)),
                         ],
                       ),
                     ],
@@ -321,7 +356,6 @@ class _ResponderManagementViewState extends State<_ResponderManagementView> {
                 ),
               ),
               const SizedBox(width: 16),
-              // Side KPIs in a horizontal row
               Expanded(
                   flex: 2,
                   child: _SmallKpiCard(
@@ -382,7 +416,6 @@ class _ResponderManagementViewState extends State<_ResponderManagementView> {
                     ),
                     Row(
                       children: [
-                        // Status Filter
                         Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 16, vertical: 8),
@@ -400,7 +433,7 @@ class _ResponderManagementViewState extends State<_ResponderManagementView> {
                               style: TextStyle(
                                   color: AppTheme.headingColor,
                                   fontWeight: FontWeight.w700),
-                              items: ['All', 'On Duty', 'Off Duty', 'Suspended']
+                              items: ['All', 'On Duty', 'Off Duty', 'Suspended', 'Deleted']
                                   .map((String value) {
                                 return DropdownMenuItem<String>(
                                   value: value,
@@ -415,7 +448,6 @@ class _ResponderManagementViewState extends State<_ResponderManagementView> {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        // Timeline Filter
                         Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 16, vertical: 8),
@@ -450,7 +482,6 @@ class _ResponderManagementViewState extends State<_ResponderManagementView> {
                   ],
                 ),
                 const SizedBox(height: 24),
-                // Table Header
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -466,7 +497,7 @@ class _ResponderManagementViewState extends State<_ResponderManagementView> {
                       Expanded(flex: 3, child: _TableHeader('LIVE LOCATION')),
                       Expanded(flex: 2, child: _TableHeader('DATE JOINED')),
                       const SizedBox(
-                          width: 100,
+                          width: 120,
                           child: Align(
                               alignment: Alignment.centerRight,
                               child: _TableHeader('ACTIONS'))),
@@ -474,7 +505,6 @@ class _ResponderManagementViewState extends State<_ResponderManagementView> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                // Table Rows
                 ...filteredResponders.asMap().entries.map((entry) {
                   final index = _responders.indexOf(entry.value);
                   final r = entry.value;
@@ -523,19 +553,38 @@ class _ResponderManagementViewState extends State<_ResponderManagementView> {
                                               fontWeight: FontWeight.w800,
                                               color: Color(0xFF1F2937))),
                                       if (isEditing)
-                                        SizedBox(
-                                          height: 24,
-                                          child: TextField(
-                                            controller: _roleController,
-                                            style: const TextStyle(
-                                                fontSize: 12,
-                                                color: Color(0xFF6B7280)),
-                                            decoration: const InputDecoration(
-                                              contentPadding:
-                                                  EdgeInsets.only(bottom: 12),
-                                              border: UnderlineInputBorder(),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: SizedBox(
+                                                height: 24,
+                                                child: TextField(
+                                                  controller: _firstController,
+                                                  style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+                                                  decoration: const InputDecoration(
+                                                    contentPadding: EdgeInsets.only(bottom: 12),
+                                                    border: UnderlineInputBorder(),
+                                                    hintText: 'First',
+                                                  ),
+                                                ),
+                                              ),
                                             ),
-                                          ),
+                                            const SizedBox(width: 4),
+                                            Expanded(
+                                              child: SizedBox(
+                                                height: 24,
+                                                child: TextField(
+                                                  controller: _lastController,
+                                                  style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+                                                  decoration: const InputDecoration(
+                                                    contentPadding: EdgeInsets.only(bottom: 12),
+                                                    border: UnderlineInputBorder(),
+                                                    hintText: 'Last',
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                         )
                                       else
                                         Text(r['role'],
@@ -608,21 +657,43 @@ class _ResponderManagementViewState extends State<_ResponderManagementView> {
                                     color: Color(0xFF6B7280), fontSize: 12)),
                           ),
                           SizedBox(
-                            width: 100,
+                            width: 120,
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.end,
-                              children: isEditing
+                              children: r['status'] == 'DELETED'
+                                  ? [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFF3F4F6),
+                                          borderRadius: BorderRadius.circular(4),
+                                          border: Border.all(color: const Color(0xFFE5E7EB)),
+                                        ),
+                                        child: const Text('DELETED', style: TextStyle(fontSize: 10, color: Color(0xFF9CA3AF), fontWeight: FontWeight.w700)),
+                                      )
+                                    ]
+                                  : isEditing
                                   ? [
                                       IconButton(
                                         icon: const Icon(Icons.check,
                                             color: Color(0xFF10B981), size: 18),
-                                        onPressed: () {
-                                          setState(() {
-                                            _responders[index]['role'] =
-                                                _roleController.text;
-                                            _editingIndex = null;
-                                          });
-                                          _showToast('Role updated');
+                                        onPressed: () async {
+                                          try {
+                                            await getIt<NetworkClient>().dio.patch(
+                                              '/dispatcher/users/${r['id']}/',
+                                              data: {
+                                                'first_name': _firstController.text,
+                                                'last_name': _lastController.text,
+                                              }
+                                            );
+                                            setState(() {
+                                              _editingIndex = null;
+                                            });
+                                            _fetchResponders();
+                                            _showToast('Name updated');
+                                          } catch (e) {
+                                            _showToast('Failed to update name');
+                                          }
                                         },
                                       ),
                                       IconButton(
@@ -640,7 +711,8 @@ class _ResponderManagementViewState extends State<_ResponderManagementView> {
                                           onTap: () {
                                             setState(() {
                                               _editingIndex = index;
-                                              _roleController.text = r['role'];
+                                              _firstController.text = r['first_name'];
+                                              _lastController.text = r['last_name'];
                                             });
                                           },
                                           child: const Icon(Icons.edit_outlined,
@@ -653,28 +725,30 @@ class _ResponderManagementViewState extends State<_ResponderManagementView> {
                                         cursor: SystemMouseCursors.click,
                                         child: GestureDetector(
                                           onTap: () {
-                                            final isSuspended =
-                                                r['status'] == 'SUSPENDED';
+                                            final isSuspended = r['is_suspended'];
                                             final action = isSuspended
                                                 ? 'unsuspend'
                                                 : 'suspend';
                                             _showConfirmModal(
                                               '${isSuspended ? 'Unsuspend' : 'Suspend'} Responder',
                                               'Are you sure you want to $action ${r['name']}?',
-                                              () {
-                                                setState(() {
-                                                  _responders[index]['status'] =
-                                                      isSuspended
-                                                          ? 'OFF DUTY'
-                                                          : 'SUSPENDED';
-                                                });
-                                                _showToast(
-                                                    'Responder ${isSuspended ? 'unsuspended' : 'suspended'}');
+                                              () async {
+                                                try {
+                                                  await getIt<NetworkClient>().dio.patch(
+                                                    '/dispatcher/users/${r['id']}/',
+                                                    data: {'is_suspended': !isSuspended}
+                                                  );
+                                                  _fetchResponders();
+                                                  _showToast(
+                                                      'Responder ${isSuspended ? 'unsuspended' : 'suspended'}');
+                                                } catch (e) {
+                                                  _showToast('Action failed');
+                                                }
                                               },
                                             );
                                           },
                                           child: Icon(
-                                              r['status'] == 'SUSPENDED'
+                                              r['is_suspended']
                                                   ? Icons.unarchive_outlined
                                                   : Icons.archive_outlined,
                                               color: const Color(0xFFF59E0B),
@@ -688,12 +762,15 @@ class _ResponderManagementViewState extends State<_ResponderManagementView> {
                                           onTap: () {
                                             _showConfirmModal(
                                               'Delete Responder',
-                                              'Are you sure you want to delete ${r['name']}? This cannot be undone.',
-                                              () {
-                                                setState(() {
-                                                  _responders.removeAt(index);
-                                                });
-                                                _showToast('Responder deleted');
+                                              'Are you sure you want to delete ${r['name']}? This will soft delete the user and obfuscate their email.',
+                                              () async {
+                                                try {
+                                                  await getIt<NetworkClient>().dio.delete('/dispatcher/users/${r['id']}/');
+                                                  _fetchResponders();
+                                                  _showToast('Responder deleted');
+                                                } catch (e) {
+                                                  _showToast('Failed to delete responder');
+                                                }
                                               },
                                             );
                                           },
@@ -723,6 +800,8 @@ class _ResponderManagementViewState extends State<_ResponderManagementView> {
 // ── User Directory Tab ────────────────────────────────────────────────────────
 
 class _UserDirectoryView extends StatefulWidget {
+  const _UserDirectoryView({super.key});
+
   @override
   State<_UserDirectoryView> createState() => _UserDirectoryViewState();
 }
@@ -730,38 +809,82 @@ class _UserDirectoryView extends StatefulWidget {
 class _UserDirectoryViewState extends State<_UserDirectoryView> {
   String _selectedStatusFilter = 'All';
   String _selectedTimeFilter = 'All Time';
+  
+  int? _editingIndex;
+  late TextEditingController _firstController;
+  late TextEditingController _lastController;
 
-  List<Map<String, dynamic>> _citizens = [
-    {
-      'name': 'John Doe',
-      'joined': 'Joined Oct 2025',
-      'email': 'john.doe@example.com',
-      'status': 'ACTIVE',
-      'activity': '14 Reports',
-    },
-    {
-      'name': 'Sarah Jenkins',
-      'joined': 'Joined Nov 2025',
-      'email': 'sarah.j@network.aid',
-      'status': 'ACTIVE',
-      'activity': '12 Reports',
-    },
-    {
-      'name': 'Alex Thompson',
-      'joined': 'Joined Dec 2025',
-      'email': 'alex.t@provider.com',
-      'status': 'INACTIVE',
-      'activity': '2 Reports',
-    },
-    {
-      'name': 'Mark Richards',
-      'joined': 'Joined Jan 2026',
-      'email': 'm.rich@temp-mail.org',
-      'status': 'DORMANT',
-      'activity': '0 Reports',
-      'isAlert': true,
-    },
-  ];
+  bool _isLoading = true;
+  List<Map<String, dynamic>> _citizens = [];
+  int _totalUsers = 0;
+  int _activeUsers = 0;
+  int _suspendedUsers = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _firstController = TextEditingController();
+    _lastController = TextEditingController();
+    _fetchCitizens();
+  }
+
+  Future<void> _fetchCitizens() async {
+    try {
+      final res = await getIt<NetworkClient>().dio.get('/dispatcher/users/');
+      final List<dynamic> results = res.data is List ? res.data : (res.data['results'] ?? []);
+      setState(() {
+        _citizens = results
+            .where((r) => r['role'] == 'CITIZEN')
+            .map((r) {
+              String statusStr = 'SUSPENDED';
+              if (!r['is_active']) {
+                statusStr = 'DELETED';
+              } else if (!r['is_suspended']) {
+                statusStr = 'ACTIVE';
+              }
+              
+              return {
+                'id': r['id'],
+                'first_name': r['first_name'] ?? '',
+                'last_name': r['last_name'] ?? '',
+                'name': r['name'] ?? 'Unknown',
+                'joined': 'Joined ${_formatDate(r['date_joined'])}',
+                'email': r['email'] ?? '',
+                'status': statusStr,
+                'activity': '0 Reports', 
+                'isAlert': r['is_suspended'],
+                'is_active': r['is_active'],
+                'is_suspended': r['is_suspended'],
+              };
+            }).toList();
+        
+        _totalUsers = _citizens.length;
+        _activeUsers = _citizens.where((c) => c['status'] == 'ACTIVE').length;
+        _suspendedUsers = _citizens.where((c) => c['status'] == 'SUSPENDED').length;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  String _formatDate(String? dateStr) {
+    if (dateStr == null) return 'Unknown';
+    try {
+      final dt = DateTime.parse(dateStr).toLocal();
+      final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return '${months[dt.month - 1]} ${dt.year}';
+    } catch (e) {
+      return 'Unknown';
+    }
+  }
+
+  @override
+  void dispose() {
+    _firstController.dispose();
+    _lastController.dispose();
+    super.dispose();
+  }
 
   void _showConfirmModal(String title, String content, VoidCallback onConfirm) {
     showDialog(
@@ -816,20 +939,18 @@ class _UserDirectoryViewState extends State<_UserDirectoryView> {
     final filteredCitizens = _citizens.where((c) {
       if (_selectedStatusFilter != 'All' &&
           c['status'] != _selectedStatusFilter.toUpperCase()) return false;
-      // Timeline filter is just mock UI for now
       return true;
     }).toList();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(
-          horizontal: 32, vertical: 16), // Reduced top space
+          horizontal: 32, vertical: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // ── Top KPI Section ───────────────────────────────────────────────
           Row(
             children: [
-              // Main Citizen Status Card
               Expanded(
                 flex: 4,
                 child: Container(
@@ -868,13 +989,13 @@ class _UserDirectoryViewState extends State<_UserDirectoryView> {
                       Row(
                         children: [
                           _StatusStat(
-                              '1,420', 'TOTAL USERS', AppTheme.headingColor),
+                              '$_totalUsers', 'TOTAL USERS', AppTheme.headingColor),
                           const SizedBox(width: 32),
                           _StatusStat(
-                              '1,280', 'ACTIVE USERS', AppTheme.headingColor),
+                              '$_activeUsers', 'ACTIVE USERS', AppTheme.headingColor),
                           const SizedBox(width: 32),
                           _StatusStat(
-                              '130', 'INACTIVE USERS', const Color(0xFFDC2626)),
+                              '$_suspendedUsers', 'SUSPENDED USERS', const Color(0xFFDC2626)),
                         ],
                       ),
                     ],
@@ -882,7 +1003,6 @@ class _UserDirectoryViewState extends State<_UserDirectoryView> {
                 ),
               ),
               const SizedBox(width: 16),
-              // Side KPIs in horizontal row
               Expanded(
                   flex: 2,
                   child: _SmallKpiCard(
@@ -943,7 +1063,6 @@ class _UserDirectoryViewState extends State<_UserDirectoryView> {
                     ),
                     Row(
                       children: [
-                        // Status Filter
                         Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 16, vertical: 8),
@@ -963,9 +1082,8 @@ class _UserDirectoryViewState extends State<_UserDirectoryView> {
                               items: [
                                 'All',
                                 'Active',
-                                'Inactive',
-                                'Dormant',
-                                'Suspended'
+                                'Suspended',
+                                'Deleted'
                               ].map((String value) {
                                 return DropdownMenuItem<String>(
                                     value: value, child: Text(value));
@@ -978,7 +1096,6 @@ class _UserDirectoryViewState extends State<_UserDirectoryView> {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        // Timeline Filter
                         Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 16, vertical: 8),
@@ -1016,7 +1133,6 @@ class _UserDirectoryViewState extends State<_UserDirectoryView> {
                   ],
                 ),
                 const SizedBox(height: 24),
-                // Table Header
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -1028,9 +1144,9 @@ class _UserDirectoryViewState extends State<_UserDirectoryView> {
                       Expanded(flex: 3, child: _TableHeader('IDENTITY')),
                       Expanded(flex: 3, child: _TableHeader('USER ID/EMAIL')),
                       Expanded(flex: 2, child: _TableHeader('ACTIVITY STATUS')),
-                      Expanded(flex: 2, child: _TableHeader('ACTIVITY')),
+                      Expanded(flex: 2, child: _TableHeader('ACTIVITY LEVEL')),
                       const SizedBox(
-                          width: 80,
+                          width: 120,
                           child: Align(
                               alignment: Alignment.centerRight,
                               child: _TableHeader('ACTIONS'))),
@@ -1038,7 +1154,6 @@ class _UserDirectoryViewState extends State<_UserDirectoryView> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                // Table Rows
                 ...filteredCitizens.asMap().entries.map((entry) {
                   final index = _citizens.indexOf(entry.value);
                   final c = entry.value;
@@ -1141,62 +1256,130 @@ class _UserDirectoryViewState extends State<_UserDirectoryView> {
                                     fontWeight: FontWeight.w700)),
                           ),
                           SizedBox(
-                            width: 80,
+                            width: 120,
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                MouseRegion(
-                                  cursor: SystemMouseCursors.click,
-                                  child: GestureDetector(
-                                    onTap: () {
-                                      final isSuspended =
-                                          c['status'] == 'SUSPENDED';
-                                      final action =
-                                          isSuspended ? 'unsuspend' : 'suspend';
-                                      _showConfirmModal(
-                                        '${isSuspended ? 'Unsuspend' : 'Suspend'} User',
-                                        'Are you sure you want to $action ${c['name']}?',
-                                        () {
-                                          setState(() {
-                                            _citizens[index]['status'] =
-                                                isSuspended
-                                                    ? 'ACTIVE'
-                                                    : 'SUSPENDED';
-                                          });
-                                          _showToast(
-                                              'User ${isSuspended ? 'unsuspended' : 'suspended'}');
+                              children: c['status'] == 'DELETED'
+                                  ? [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFF3F4F6),
+                                          borderRadius: BorderRadius.circular(4),
+                                          border: Border.all(color: const Color(0xFFE5E7EB)),
+                                        ),
+                                        child: const Text('DELETED', style: TextStyle(fontSize: 10, color: Color(0xFF9CA3AF), fontWeight: FontWeight.w700)),
+                                      )
+                                    ]
+                                  : _editingIndex == index
+                                  ? [
+                                      IconButton(
+                                        icon: const Icon(Icons.check,
+                                            color: Color(0xFF10B981), size: 18),
+                                        onPressed: () async {
+                                          try {
+                                            await getIt<NetworkClient>().dio.patch(
+                                              '/dispatcher/users/${c['id']}/',
+                                              data: {
+                                                'first_name': _firstController.text,
+                                                'last_name': _lastController.text,
+                                              }
+                                            );
+                                            setState(() {
+                                              _editingIndex = null;
+                                            });
+                                            _fetchCitizens();
+                                            _showToast('Name updated');
+                                          } catch (e) {
+                                            _showToast('Failed to update name');
+                                          }
                                         },
-                                      );
-                                    },
-                                    child: Icon(
-                                        c['status'] == 'SUSPENDED'
-                                            ? Icons.unarchive_outlined
-                                            : Icons.archive_outlined,
-                                        color: const Color(0xFFF59E0B),
-                                        size: 20),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                MouseRegion(
-                                  cursor: SystemMouseCursors.click,
-                                  child: GestureDetector(
-                                    onTap: () {
-                                      _showConfirmModal(
-                                        'Delete User',
-                                        'Are you sure you want to permanently delete ${c['name']}?',
-                                        () {
-                                          setState(() {
-                                            _citizens.removeAt(index);
-                                          });
-                                          _showToast('User deleted');
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.close,
+                                            color: Color(0xFF6B7280), size: 18),
+                                        onPressed: () {
+                                          setState(() => _editingIndex = null);
                                         },
-                                      );
-                                    },
-                                    child: const Icon(Icons.delete_outline,
-                                        color: Color(0xFFDC2626), size: 20),
-                                  ),
-                                ),
-                              ],
+                                      ),
+                                    ]
+                                  : [
+                                      MouseRegion(
+                                        cursor: SystemMouseCursors.click,
+                                        child: GestureDetector(
+                                          onTap: () {
+                                            setState(() {
+                                              _editingIndex = index;
+                                              _firstController.text = c['first_name'];
+                                              _lastController.text = c['last_name'];
+                                            });
+                                          },
+                                          child: const Icon(Icons.edit_outlined,
+                                              color: Color(0xFF6B7280),
+                                              size: 20),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      MouseRegion(
+                                        cursor: SystemMouseCursors.click,
+                                        child: GestureDetector(
+                                          onTap: () {
+                                            final isSuspended = c['is_suspended'];
+                                            final action = isSuspended
+                                                ? 'unsuspend'
+                                                : 'suspend';
+                                            _showConfirmModal(
+                                              '${isSuspended ? 'Unsuspend' : 'Suspend'} Citizen',
+                                              'Are you sure you want to $action ${c['name']}?',
+                                              () async {
+                                                try {
+                                                  await getIt<NetworkClient>().dio.patch(
+                                                    '/dispatcher/users/${c['id']}/',
+                                                    data: {'is_suspended': !isSuspended}
+                                                  );
+                                                  _fetchCitizens();
+                                                  _showToast(
+                                                      'Citizen ${isSuspended ? 'unsuspended' : 'suspended'}');
+                                                } catch (e) {
+                                                  _showToast('Action failed');
+                                                }
+                                              },
+                                            );
+                                          },
+                                          child: Icon(
+                                              c['is_suspended']
+                                                  ? Icons.unarchive_outlined
+                                                  : Icons.archive_outlined,
+                                              color: const Color(0xFFF59E0B),
+                                              size: 20),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      MouseRegion(
+                                        cursor: SystemMouseCursors.click,
+                                        child: GestureDetector(
+                                          onTap: () {
+                                            _showConfirmModal(
+                                              'Delete Citizen',
+                                              'Are you sure you want to permanently delete ${c['name']}? This will soft delete the user and obfuscate their email.',
+                                              () async {
+                                                try {
+                                                  await getIt<NetworkClient>().dio.delete('/dispatcher/users/${c['id']}/');
+                                                  _fetchCitizens();
+                                                  _showToast('Citizen deleted');
+                                                } catch (e) {
+                                                  _showToast('Failed to delete citizen');
+                                                }
+                                              },
+                                            );
+                                          },
+                                          child: const Icon(
+                                              Icons.delete_outline,
+                                              color: Color(0xFFDC2626),
+                                              size: 20),
+                                        ),
+                                      ),
+                                    ],
                             ),
                           ),
                         ],

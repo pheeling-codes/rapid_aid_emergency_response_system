@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/theme.dart';
 import '../../../core/widgets/user_profile_avatar.dart';
 import '../../../main.dart';
+import '../../../core/network/network_client.dart';
 import '../../../features/auth/data/token_storage.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
@@ -25,70 +26,164 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     _userEmail = ts.getUserEmail() ?? 'Admin';
     _userName = ts.getUserName() ?? _userEmail.split('@').first;
     _userRole = ts.getUserRole() ?? 'DISPATCHER';
+    
+    _fetchStats();
+    _fetchIncidents();
   }
 
-  final List<Map<String, dynamic>> _incidents = [
-    {
-      'type': 'MEDICAL',
-      'typeColor': const Color(0xFFDC2626),
-      'title': 'Cardiac Arrest',
-      'address': '402 W 51st St, New York',
-      'fullAddress': '402 W 51st St, New York, NY 10019',
-      'time': '2m ago',
-      'reporter': 'Jane Doe (Bystander)',
-      'notes': '"Patient collapsed in pharmacy. Unresponsive. Bystander started CPR."',
-      'icon': Icons.monitor_heart,
-      'priority': 'PRIORITY 1 CRITICAL',
-    },
-    {
-      'type': 'FIRE',
-      'typeColor': const Color(0xFFF59E0B),
-      'title': 'Building Fire',
-      'address': '128 8th Ave, New York',
-      'fullAddress': '128 8th Ave, New York, NY 10011',
-      'time': '8m ago',
-      'reporter': 'John Smith',
-      'notes': '"Smoke coming from 3rd floor window. Evacuation in progress."',
-      'icon': Icons.local_fire_department,
-      'priority': 'PRIORITY 1 URGENT',
-    },
-    {
-      'type': 'ACCIDENT',
-      'typeColor': const Color(0xFF3B82F6),
-      'title': 'Vehicle Collision',
-      'address': 'Metropolitan Ave',
-      'fullAddress': '1901 Metropolitan Ave, New York, NY 10029',
-      'time': '15m ago',
-      'reporter': 'Dr. Alan Grant',
-      'notes': '"Two vehicle collision. One driver trapped."',
-      'icon': Icons.car_crash,
-      'priority': 'URGENT DISPATCH',
-    },
-    {
-      'type': 'SECURITY',
-      'typeColor': const Color(0xFF8B5CF6),
-      'title': 'Intrusion Alarm',
-      'address': '7th Avenue Bank',
-      'fullAddress': '7th Avenue Bank, New York, NY 10036',
-      'time': '20m ago',
-      'reporter': 'Automated System',
-      'notes': '"Silent alarm triggered at main vault."',
-      'icon': Icons.security,
-      'priority': 'SECURITY DISPATCH',
-    },
-  ];
+  bool _isLoadingStats = true;
+  int _totalUnits = 0;
+  int _activeUnits = 0;
 
-  final List<Map<String, dynamic>> _units = [
-    {'name': 'Unit 7A (ALS)', 'distance': '0.8 mi', 'eta': 'ETA: 3 mins'},
-    {'name': 'Unit 12B (BLS)', 'distance': '1.4 mi', 'eta': 'ETA: 6 mins'},
-    {'name': 'Rapid Response 4', 'distance': '2.1 mi', 'eta': 'ETA: 8 mins'},
-  ];
+  bool _isLoadingIncidents = true;
+  List<Map<String, dynamic>> _incidents = [];
+  
+  bool _isLoadingUnits = false;
+  List<Map<String, dynamic>> _units = [];
+
+  Future<void> _fetchStats() async {
+    try {
+      final res = await getIt<NetworkClient>().dio.get('/dispatcher/dashboard/stats/');
+      if (mounted) {
+        setState(() {
+          _totalUnits = res.data['total_units'] ?? 0;
+          _activeUnits = res.data['active_units'] ?? 0;
+          _isLoadingStats = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingStats = false);
+    }
+  }
+
+  Future<void> _fetchIncidents() async {
+    try {
+      final res = await getIt<NetworkClient>().dio.get('/incidents/');
+      if (mounted) {
+        final List<dynamic> results = res.data is List ? res.data : (res.data['results'] ?? []);
+        setState(() {
+          _incidents = results.map((inc) {
+            String cat = inc['category'] ?? 'OTHER';
+            Color tColor = const Color(0xFF3B82F6);
+            IconData iData = Icons.warning;
+            if (cat == 'MEDICAL') {
+              tColor = const Color(0xFFDC2626);
+              iData = Icons.monitor_heart;
+            } else if (cat == 'FIRE') {
+              tColor = const Color(0xFFF59E0B);
+              iData = Icons.local_fire_department;
+            } else if (cat == 'POLICE' || cat == 'SECURITY') {
+              tColor = const Color(0xFF8B5CF6);
+              iData = Icons.security;
+            } else if (cat == 'ACCIDENT') {
+              tColor = const Color(0xFF3B82F6);
+              iData = Icons.car_crash;
+            }
+
+            return {
+              'id': inc['id'],
+              'type': cat,
+              'typeColor': tColor,
+              'title': inc['title'] ?? 'Unknown',
+              'address': (inc['address'] ?? '').split(',').first,
+              'fullAddress': inc['address'] ?? 'No Address',
+              'time': _formatTimeAgo(inc['created_at']),
+              'reporter': inc['reporter_name'] ?? 'Unknown',
+              'notes': inc['description'] ?? '',
+              'icon': iData,
+              'priority': inc['severity'] ?? 'NORMAL',
+            };
+          }).toList();
+          _isLoadingIncidents = false;
+          if (_incidents.isNotEmpty) {
+            _fetchClosestResponders(_incidents[_selectedIncidentIndex]['id']);
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingIncidents = false);
+    }
+  }
+
+  String _formatTimeAgo(String? dateStr) {
+    if (dateStr == null) return '';
+    try {
+      final dt = DateTime.parse(dateStr).toLocal();
+      final diff = DateTime.now().difference(dt);
+      if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+      if (diff.inHours < 24) return '${diff.inHours}h ago';
+      return '${diff.inDays}d ago';
+    } catch (e) {
+      return '';
+    }
+  }
+
+  Future<void> _fetchClosestResponders(String incidentId) async {
+    setState(() => _isLoadingUnits = true);
+    try {
+      final res = await getIt<NetworkClient>().dio.get('/dispatcher/incidents/$incidentId/closest_responders/');
+      if (mounted) {
+        final List<dynamic> results = res.data['results'] ?? [];
+        setState(() {
+          _units = results.map((r) {
+            return {
+              'id': r['id'],
+              'name': r['name'] ?? 'Unknown Responder',
+              'distance': '${r['distance_km']} km',
+              'eta': 'ETA: ${r['eta_mins']} mins',
+              'profile_image': r['profile_image'],
+            };
+          }).toList();
+          _selectedUnitIndex = 0;
+          _isLoadingUnits = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingUnits = false);
+    }
+  }
+
+  Future<void> _dispatchUnit() async {
+    if (_units.isEmpty || _incidents.isEmpty) return;
+    final selectedUnit = _units[_selectedUnitIndex];
+    final selectedIncident = _incidents[_selectedIncidentIndex];
+
+    try {
+      await getIt<NetworkClient>().dio.post(
+        '/dispatcher/incidents/${selectedIncident['id']}/dispatch/', 
+        data: {'responder_id': selectedUnit['id']}
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${selectedUnit['name']} dispatched successfully!'),
+            backgroundColor: const Color(0xFF10B981),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+        _fetchIncidents();
+        _fetchStats();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to dispatch unit: $e'),
+            backgroundColor: const Color(0xFFDC2626),
+          ),
+        );
+      }
+    }
+  }
+
+  // Removed static lists
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final selectedIncident = _incidents[_selectedIncidentIndex];
+    final selectedIncident = _incidents.isNotEmpty && _selectedIncidentIndex < _incidents.length ? _incidents[_selectedIncidentIndex] : null;
 
     return Scaffold(
       backgroundColor: cs.surfaceContainerLowest,
@@ -239,7 +334,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       ),
                       const SizedBox(height: 16),
                       Expanded(
-                        child: ListView.builder(
+                        child: _isLoadingIncidents 
+                          ? const Center(child: CircularProgressIndicator(color: Colors.white))
+                          : _incidents.isEmpty
+                            ? const Center(child: Text('No active incidents', style: TextStyle(color: Colors.white54)))
+                            : ListView.builder(
                           itemCount: _incidents.length,
                           itemBuilder: (context, index) {
                             final inc = _incidents[index];
@@ -256,6 +355,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   setState(() {
                                     _selectedIncidentIndex = index;
                                   });
+                                  _fetchClosestResponders(inc['id']);
                                 },
                               ),
                             );
@@ -287,6 +387,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         // Selected Incident Details
+                        if (selectedIncident != null)
                         Container(
                           padding: const EdgeInsets.all(24),
                           decoration: BoxDecoration(
@@ -383,7 +484,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         
                         // Nearest Responders List
                         Expanded(
-                          child: ListView.builder(
+                          child: _isLoadingUnits
+                            ? const Center(child: CircularProgressIndicator())
+                            : ListView.builder(
                             padding: const EdgeInsets.all(24),
                             itemCount: _units.length + 1,
                             itemBuilder: (context, index) {
@@ -426,17 +529,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           child: MouseRegion(
                             cursor: SystemMouseCursors.click,
                             child: ElevatedButton(
-                              onPressed: () {
-                                final selectedUnit = _units[_selectedUnitIndex]['name'];
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('$selectedUnit dispatched successfully!'),
-                                    backgroundColor: const Color(0xFF10B981),
-                                    behavior: SnackBarBehavior.floating,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                  ),
-                                );
-                              },
+                              onPressed: _units.isEmpty ? null : _dispatchUnit,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFFDC2626), // Red
                                 padding: const EdgeInsets.symmetric(vertical: 18),
@@ -450,9 +543,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                 children: [
                                   const Icon(Icons.send_rounded, color: Colors.white, size: 20),
                                   const SizedBox(width: 12),
-                                  Text(
-                                    'DISPATCH ${_units[_selectedUnitIndex]['name'].split(' ')[0]} ${_units[_selectedUnitIndex]['name'].split(' ')[1]}',
-                                    style: const TextStyle(
+                                    Text(
+                                      _units.isEmpty 
+                                          ? 'NO UNITS AVAILABLE' 
+                                          : 'DISPATCH ${_units[_selectedUnitIndex]['name'].split(' ').take(2).join(' ')}',
+                                      style: const TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.w900,
                                       letterSpacing: 1.0,
@@ -475,7 +570,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   right: 400, // Left of the right panel
                   child: Row(
                     children: [
-                      _MetricCard(title: 'ACTIVE UNITS', value: '12', subValue: ' / 14'),
+                      _MetricCard(title: 'ACTIVE UNITS', value: '$_activeUnits', subValue: ' / $_totalUnits'),
                       const SizedBox(width: 16),
                       _MetricCard(title: 'RESPONSE TIME', value: '4.2', subValue: ' min avg'),
                     ],

@@ -296,8 +296,9 @@ class _ResponderMapScreenState extends State<ResponderMapScreen>
 
     try {
       final dio = getIt<NetworkClient>().dio;
-      await dio.patch('/incidents/${_activeIncident!['id']}/', data: {
+      await dio.post('/incidents/${_activeIncident!['id']}/logs/', data: {
         'status': newStatusStr,
+        'note': 'Status updated to $actionName by responder.',
       });
 
       if (mounted) {
@@ -397,6 +398,13 @@ class _ResponderMapScreenState extends State<ResponderMapScreen>
                                 fontWeight: FontWeight.w900,
                                 color: AppTheme.headingColor,
                                 letterSpacing: 1.0)))),
+                Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0xFFE5E7EB), width: 2),
+                  ),
+                  child: const UserProfileAvatar(radius: 16),
+                ),
               ],
             ),
           ),
@@ -726,10 +734,10 @@ class _ResponderMapScreenState extends State<ResponderMapScreen>
                                 runSpacing: 8,
                                 children: evidences.map((e) {
                                   try {
-                                    final imgBytes = e.toString().contains(',')
-                                        ? base64Decode(
-                                            e.toString().split(',').last)
-                                        : base64Decode(e.toString());
+                                    final eStr = e.toString().replaceAll('\n', '').replaceAll('\r', '');
+                                    final imgBytes = eStr.contains(',')
+                                        ? base64Decode(eStr.split(',').last)
+                                        : base64Decode(eStr);
                                     return Container(
                                       width: 72,
                                       height: 72,
@@ -740,7 +748,8 @@ class _ResponderMapScreenState extends State<ResponderMapScreen>
                                             fit: BoxFit.cover),
                                       ),
                                     );
-                                  } catch (_) {
+                                  } catch (err) {
+                                    debugPrint('Base64 decode error: $err');
                                     return const SizedBox();
                                   }
                                 }).toList(),

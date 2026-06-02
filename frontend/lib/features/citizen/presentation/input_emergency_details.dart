@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:ui';
 import '../../../core/theme/theme.dart';
+import '../../../core/widgets/user_profile_avatar.dart';
 import '../../../core/widgets/ambient_shadow.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 // ignore: avoid_web_libraries_in_flutter
@@ -208,12 +209,7 @@ class _InputEmergencyDetailsState extends State<InputEmergencyDetails> {
                       border:
                           Border.all(color: cs.surfaceContainerHigh, width: 2),
                     ),
-                    child: CircleAvatar(
-                      radius: 16,
-                      backgroundColor: cs.surfaceContainerLow,
-                      child: Icon(Icons.person,
-                          color: cs.onSurface.withOpacity(0.7), size: 20),
-                    ),
+                    child: const UserProfileAvatar(radius: 16),
                   ),
                 ],
               ),

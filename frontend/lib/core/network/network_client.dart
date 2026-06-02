@@ -35,6 +35,8 @@ class NetworkClient {
       LogInterceptor(
         requestBody: true,
         responseBody: true,
+        requestHeader: true,
+        responseHeader: true,
         error: true,
       ),
     ]);

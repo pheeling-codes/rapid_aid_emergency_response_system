@@ -9,8 +9,6 @@ urlpatterns = [
     path('api/incidents/', include('incidents.urls')),
     path('api/notifications/', include('notifications.urls')),
 
-    # Dispatcher health check
-    path('api/dispatcher/health/', include([
-        path('', (lambda: __import__('dispatcher.views', fromlist=['DispatcherHealthView']).DispatcherHealthView.as_view())(), name='dispatcher_health'),
-    ])),
+    # Dispatcher API
+    path('api/dispatcher/', include('dispatcher.urls')),
 ]

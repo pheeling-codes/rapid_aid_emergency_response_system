@@ -46,6 +46,11 @@ class CustomUser(AbstractUser):
         db_index=True,
         help_text='Whether the responder is currently available for dispatch.',
     )
+    is_suspended = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text='If True, citizen cannot submit SOS and responder cannot toggle on duty.',
+    )
 
     # ── Contact & Push ──────────────────────────────────────
     phone_number = models.CharField(
@@ -102,3 +107,18 @@ class CustomUser(AbstractUser):
     @property
     def is_citizen(self):
         return self.role == self.Role.CITIZEN
+
+class BlacklistedEmail(models.Model):
+    """
+    Tracks deleted user emails to enforce a 48-hour registration lockout.
+    """
+    email = models.EmailField(unique=True, db_index=True)
+    locked_until = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Blacklisted Email'
+        verbose_name_plural = 'Blacklisted Emails'
+
+    def __str__(self):
+        return f'{self.email} (Locked until {self.locked_until})'

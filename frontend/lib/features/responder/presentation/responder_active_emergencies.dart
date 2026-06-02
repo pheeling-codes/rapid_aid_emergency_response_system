@@ -226,8 +226,11 @@ class _EmergencyCardState extends State<_EmergencyCard> {
       // No, `assigned_responder` must be provided. Let me just use `ts.getUserId()`.
 
       await dio.patch('/incidents/${widget.item['id']}/', data: {
-        'status': 'EN_ROUTE',
         'assigned_responder': ts.getUserId(),
+      });
+      await dio.post('/incidents/${widget.item['id']}/logs/', data: {
+        'status': 'EN_ROUTE',
+        'note': 'Responder accepted dispatch and is en route.',
       });
       if (mounted) {
         context.go('/responder/map');
