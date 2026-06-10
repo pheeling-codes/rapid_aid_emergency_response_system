@@ -20,7 +20,7 @@ class ResponseLogSerializer(serializers.ModelSerializer):
             'id', 'incident', 'responder', 'responder_name',
             'status', 'previous_status', 'note', 'timestamp',
         ]
-        read_only_fields = ['id', 'timestamp']
+        read_only_fields = ['id', 'timestamp', 'incident', 'responder', 'previous_status']
 
 
 class IncidentSerializer(serializers.ModelSerializer):
