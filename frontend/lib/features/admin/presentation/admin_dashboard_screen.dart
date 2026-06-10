@@ -4,6 +4,7 @@ import '../../../core/widgets/user_profile_avatar.dart';
 import '../../../main.dart';
 import '../../../core/network/network_client.dart';
 import '../../../features/auth/data/token_storage.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -34,6 +35,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   bool _isLoadingStats = true;
   int _totalUnits = 0;
   int _activeUnits = 0;
+  int _totalIncidents = 0;
+  int _activeIncidents = 0;
 
   bool _isLoadingIncidents = true;
   List<Map<String, dynamic>> _incidents = [];
@@ -48,6 +51,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         setState(() {
           _totalUnits = res.data['total_units'] ?? 0;
           _activeUnits = res.data['active_units'] ?? 0;
+          _totalIncidents = res.data['total_incidents'] ?? 0;
+          _activeIncidents = res.data['active_incidents'] ?? 0;
           _isLoadingStats = false;
         });
       }
@@ -62,7 +67,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       if (mounted) {
         final List<dynamic> results = res.data is List ? res.data : (res.data['results'] ?? []);
         setState(() {
-          _incidents = results.map((inc) {
+          _incidents = results
+            .where((inc) => inc['status'] == 'PENDING' || inc['status'] == 'UNASSIGNED')
+            .map((inc) {
             String cat = inc['category'] ?? 'OTHER';
             Color tColor = const Color(0xFF3B82F6);
             IconData iData = Icons.warning;
@@ -92,6 +99,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               'notes': inc['description'] ?? '',
               'icon': iData,
               'priority': inc['severity'] ?? 'NORMAL',
+              'lat': inc['location_coords']?['lat'],
+              'lng': inc['location_coords']?['lng'],
             };
           }).toList();
           _isLoadingIncidents = false;
@@ -132,6 +141,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               'distance': '${r['distance_km']} km',
               'eta': 'ETA: ${r['eta_mins']} mins',
               'profile_image': r['profile_image'],
+              'lat': r['lat'],
+              'lng': r['lng'],
             };
           }).toList();
           _selectedUnitIndex = 0;
@@ -162,6 +173,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         );
+        _selectedIncidentIndex = 0;
+        _units.clear();
         _fetchIncidents();
         _fetchStats();
       }
@@ -298,13 +311,50 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           Expanded(
             child: Stack(
               children: [
-                // Simulated Map Background
+                // Google Map Background
                 Container(
-                  color: const Color(0xFFE5E7EB), // Light gray map bg
-                  child: CustomPaint(
-                    painter: _AdminMapPainter(),
-                    child: const SizedBox.expand(),
-                  ),
+                  color: const Color(0xFFE5E7EB),
+                  child: selectedIncident != null && selectedIncident['lat'] != null && selectedIncident['lng'] != null
+                    ? GoogleMap(
+                        initialCameraPosition: CameraPosition(
+                          target: LatLng(selectedIncident['lat'], selectedIncident['lng']),
+                          zoom: 14,
+                        ),
+                        markers: {
+                          Marker(
+                            markerId: MarkerId('incident_${selectedIncident['id']}'),
+                            position: LatLng(selectedIncident['lat'], selectedIncident['lng']),
+                            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+                            infoWindow: InfoWindow(title: selectedIncident['title']),
+                          ),
+                          ..._units.where((u) => u['lat'] != null && u['lng'] != null).map((u) {
+                            return Marker(
+                              markerId: MarkerId('unit_${u['id']}'),
+                              position: LatLng(u['lat'], u['lng']),
+                              icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+                              infoWindow: InfoWindow(title: u['name'], snippet: u['distance']),
+                            );
+                          }),
+                        },
+                        polylines: {
+                          ..._units.where((u) => u['lat'] != null && u['lng'] != null).map((u) {
+                            return Polyline(
+                              polylineId: PolylineId('route_${u['id']}'),
+                              points: [
+                                LatLng(u['lat'], u['lng']),
+                                LatLng(selectedIncident['lat'], selectedIncident['lng']),
+                              ],
+                              color: const Color(0xFF3B82F6),
+                              width: 3,
+                              patterns: [PatternItem.dash(20), PatternItem.gap(10)],
+                            );
+                          }),
+                        },
+                        zoomControlsEnabled: false,
+                        mapToolbarEnabled: false,
+                        myLocationButtonEnabled: false,
+                      )
+                    : const Center(child: Text('No location available')),
                 ),
 
                 // ── Left Overlay: Active Incidents ──────────────────────────
@@ -323,7 +373,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: const Text(
-                          'ACTIVE INCIDENTS',
+                          'UNASSIGNED INCIDENTS',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 10,
@@ -486,7 +536,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         Expanded(
                           child: _isLoadingUnits
                             ? const Center(child: CircularProgressIndicator())
-                            : ListView.builder(
+                            : _units.isEmpty
+                                ? Center(
+                                    child: Text(
+                                      'No responders available nearby',
+                                      style: theme.textTheme.bodyMedium?.copyWith(
+                                        color: const Color(0xFF6B7280),
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                    ),
+                                  )
+                                : ListView.builder(
                             padding: const EdgeInsets.all(24),
                             itemCount: _units.length + 1,
                             itemBuilder: (context, index) {
@@ -570,9 +630,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   right: 400, // Left of the right panel
                   child: Row(
                     children: [
-                      _MetricCard(title: 'ACTIVE UNITS', value: '$_activeUnits', subValue: ' / $_totalUnits'),
+                      _MetricCard(
+                        title: 'ACTIVE UNITS',
+                        value: _units.isEmpty ? '0' : '$_activeUnits',
+                        subValue: _units.isEmpty ? ' - No available responders' : ' / $_totalUnits',
+                        valueSize: _units.isEmpty ? 14 : 24,
+                      ),
                       const SizedBox(width: 16),
-                      _MetricCard(title: 'RESPONSE TIME', value: '4.2', subValue: ' min avg'),
+                      _MetricCard(
+                        title: 'UNASSIGNED INCIDENTS',
+                        value: '$_activeIncidents',
+                        subValue: ' / $_totalIncidents',
+                      ),
                     ],
                   ),
                 ),
@@ -801,11 +870,13 @@ class _MetricCard extends StatelessWidget {
   final String title;
   final String value;
   final String subValue;
+  final double valueSize;
 
   const _MetricCard({
     required this.title,
     required this.value,
     required this.subValue,
+    this.valueSize = 24,
   });
 
   @override
@@ -847,7 +918,8 @@ class _MetricCard extends StatelessWidget {
                 value,
                 style: theme.textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w900,
-                  color: AppTheme.headingColor,
+                  color: AppTheme.primary,
+                  fontSize: valueSize,
                 ),
               ),
               Text(

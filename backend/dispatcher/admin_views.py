@@ -11,6 +11,8 @@ from accounts.models import BlacklistedEmail
 from incidents.models import Incident
 from notifications.models import NotificationQueue
 from django.contrib.gis.db.models.functions import Distance
+from django.contrib.admin.models import LogEntry, CHANGE
+from django.contrib.contenttypes.models import ContentType
 
 User = get_user_model()
 
@@ -22,13 +24,18 @@ class DashboardStatsView(APIView):
     permission_classes = [IsDispatcherOrAdmin]
 
     def get(self, request):
-        responders = User.objects.filter(role=User.Role.RESPONDER, is_active=True)
+        responders = User.objects.filter(role=User.Role.RESPONDER, is_active=True).exclude(email__startswith='deleted_')
         total_units = responders.count()
-        active_units = responders.filter(is_available=True).count()
+        active_units = responders.filter(is_available=True, is_suspended=False).count()
+        
+        total_incidents = Incident.objects.count()
+        active_incidents = Incident.objects.filter(status=Incident.Status.PENDING).count()
         
         return Response({
             'total_units': total_units,
             'active_units': active_units,
+            'total_incidents': total_incidents,
+            'active_incidents': active_incidents,
         })
 
 class ClosestRespondersView(APIView):
@@ -62,6 +69,8 @@ class ClosestRespondersView(APIView):
                 'distance_km': round(dist_km, 2),
                 'eta_mins': eta_mins,
                 'profile_image': r.profile_image,
+                'lat': r.location.y if r.location else None,
+                'lng': r.location.x if r.location else None,
             })
 
         return Response({'results': results})
@@ -87,6 +96,16 @@ class ManualDispatchView(APIView):
             responder.is_available = False
             responder.save()
 
+            # Log the change
+            LogEntry.objects.log_action(
+                user_id=request.user.id,
+                content_type_id=ContentType.objects.get_for_model(Incident).pk,
+                object_id=incident.id,
+                object_repr=str(incident),
+                action_flag=CHANGE,
+                change_message=f"Dispatched responder {responder.get_full_name() or responder.username} to incident {incident.ref_id}"
+            )
+
         return Response({'status': 'Dispatched successfully', 'incident_id': incident.id})
 
 class AdminUsersView(APIView):
@@ -96,6 +115,14 @@ class AdminUsersView(APIView):
         users = User.objects.all().order_by('-date_joined')
         data = []
         for u in users:
+            loc = None
+            if u.location:
+                loc = f"{u.location.y}, {u.location.x}"
+                
+            report_count = u.reported_incidents.count() if u.role == User.Role.CITIZEN else 0
+            changes_made = LogEntry.objects.filter(user=u).count() if u.role == User.Role.DISPATCHER else 0
+            is_responding = Incident.objects.filter(assigned_responder=u, status__in=[Incident.Status.EN_ROUTE, Incident.Status.ON_SCENE]).exists() if u.role == User.Role.RESPONDER else False
+            
             data.append({
                 'id': u.id,
                 'email': u.email,
@@ -106,9 +133,13 @@ class AdminUsersView(APIView):
                 'is_active': u.is_active,
                 'is_available': u.is_available,
                 'is_suspended': u.is_suspended,
+                'is_responding': is_responding,
                 'phone_number': u.phone_number,
                 'last_login': u.last_login,
                 'date_joined': u.date_joined,
+                'location_coords': loc,
+                'report_count': report_count,
+                'changes_made': changes_made,
             })
         return Response({'results': data})
 
@@ -138,6 +169,16 @@ class AdminUsersDetailView(APIView):
                 msg = f"An admin changed your name from '{old_name}' to '{new_name}'."
                 NotificationQueue.objects.create(user=user, message=msg)
 
+            # Log the change
+            LogEntry.objects.log_action(
+                user_id=request.user.id,
+                content_type_id=ContentType.objects.get_for_model(User).pk,
+                object_id=user.id,
+                object_repr=str(user),
+                action_flag=CHANGE,
+                change_message=f"Updated user {new_name} (Suspended: {user.is_suspended})"
+            )
+
         return Response({'status': 'updated'})
 
     def delete(self, request, user_id):
@@ -161,5 +202,15 @@ class AdminUsersDetailView(APIView):
             # 3. Soft Delete
             user.is_active = False
             user.save()
+
+            from django.contrib.admin.models import DELETION
+            LogEntry.objects.log_action(
+                user_id=request.user.id,
+                content_type_id=ContentType.objects.get_for_model(User).pk,
+                object_id=user.id,
+                object_repr=str(user),
+                action_flag=DELETION,
+                change_message=f"Soft deleted user {original_email}"
+            )
 
         return Response({'status': 'deleted'})

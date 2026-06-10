@@ -22,6 +22,9 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen> {
   List<Map<String, dynamic>> _incidents = [];
 
   int _totalResolved = 0;
+  int _inProgressCount = 0;
+  int _cancelledCount = 0;
+  int _unassignedCount = 0;
   String _avgResponseTime = '0m';
   String _successRate = '0%';
 
@@ -38,12 +41,18 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen> {
         final List<dynamic> results = res.data is List ? res.data : (res.data['results'] ?? []);
         
         int resolvedCount = 0;
+        int inProgressCount = 0;
+        int cancelledCount = 0;
+        int unassignedCount = 0;
         int totalResponseSecs = 0;
         int validResponseCount = 0;
 
         final mapped = results.map((inc) {
           final isResolved = inc['status'] == 'RESOLVED';
           if (isResolved) resolvedCount++;
+          if (inc['status'] == 'EN_ROUTE' || inc['status'] == 'ON_SCENE') inProgressCount++;
+          if (inc['status'] == 'CANCELLED') cancelledCount++;
+          if (inc['status'] == 'PENDING' || inc['status'] == 'UNASSIGNED') unassignedCount++;
 
           String responseTime = 'Pending';
           if (inc['created_at'] != null && inc['resolved_at'] != null) {
@@ -57,13 +66,16 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen> {
              responseTime = 'In Progress';
           }
 
+          String type = inc['category']?.toString().toUpperCase() ?? 'OTHER';
+          if (type == 'CRIME') type = 'SECURITY';
           return {
-            'id': inc['ref_id'] ?? inc['id'].toString(),
-            'type': inc['category']?.toString().toUpperCase() ?? 'OTHER',
+            'id': '#${inc['ref_id'] ?? inc['id'].toString()}',
+            'type': type,
             'title': inc['title'] ?? 'Incident',
             'location': inc['address'] ?? 'Unknown Location',
-            'status': inc['status'] ?? 'PENDING',
+            'status': inc['status'] == 'PENDING' ? 'UNASSIGNED' : (inc['status'] ?? 'UNASSIGNED'),
             'time': _formatTime(inc['created_at']),
+            'rawDate': inc['created_at'],
             'unit': inc['responder_name'] ?? 'Unassigned',
             'response': responseTime,
             'details': inc['description'] ?? 'No details provided.',
@@ -73,6 +85,9 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen> {
         setState(() {
           _incidents = mapped;
           _totalResolved = resolvedCount;
+          _inProgressCount = inProgressCount;
+          _cancelledCount = cancelledCount;
+          _unassignedCount = unassignedCount;
           
           if (validResponseCount > 0) {
             final avgSecs = totalResponseSecs / validResponseCount;
@@ -95,15 +110,27 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen> {
     if (dateStr == null) return 'Unknown';
     try {
       final dt = DateTime.parse(dateStr).toLocal();
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      final day = dt.day;
+      final month = monthNames[dt.month - 1];
+      final year = dt.year;
       int hour = dt.hour;
       final min = dt.minute.toString().padLeft(2, '0');
       final period = hour >= 12 ? 'PM' : 'AM';
       if (hour > 12) hour -= 12;
       if (hour == 0) hour = 12;
-      return '$hour:$min $period';
+      return '$day $month $year, $hour:$min $period';
     } catch (e) {
       return 'Unknown';
     }
+  }
+
+  Color _getCategoryColor(String type) {
+    if (type == 'MEDICAL') return const Color(0xFFDC2626);
+    if (type == 'FIRE') return const Color(0xFFF59E0B);
+    if (type == 'POLICE' || type == 'SECURITY') return const Color(0xFF8B5CF6);
+    if (type == 'ACCIDENT') return const Color(0xFF3B82F6);
+    return const Color(0xFF6B7280);
   }
 
   @override
@@ -115,8 +142,18 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen> {
       if (_selectedCategory != 'All Categories' && inc['type'] != _selectedCategory.toUpperCase()) {
         return false;
       }
-      if (_selectedStatus != 'All Statuses' && inc['status'] != _selectedStatus.toUpperCase()) {
-        return false;
+      if (_selectedStatus != 'All Statuses') {
+        final backendStatus = _selectedStatus.toUpperCase().replaceAll(' ', '_');
+        if (inc['status'] != backendStatus) return false;
+      }
+      if (_selectedTime != 'All Time' && inc['rawDate'] != null) {
+        try {
+          final dt = DateTime.parse(inc['rawDate']).toLocal();
+          final now = DateTime.now();
+          if (_selectedTime == 'Last 24 Hours' && now.difference(dt).inHours > 24) return false;
+          if (_selectedTime == 'Last 7 Days' && now.difference(dt).inDays > 7) return false;
+          if (_selectedTime == 'Last 30 Days' && now.difference(dt).inDays > 30) return false;
+        } catch (_) {}
       }
       return true;
     }).toList();
@@ -191,11 +228,15 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen> {
                         // Analytics Header
                         Row(
                           children: [
-                            Expanded(child: _AnalyticCard(title: 'TOTAL RESOLVED', value: '$_totalResolved', trend: '-', isPositive: true)),
-                            const SizedBox(width: 24),
-                            Expanded(child: _AnalyticCard(title: 'AVG RESPONSE TIME', value: _avgResponseTime, trend: '-', isPositive: true)),
-                            const SizedBox(width: 24),
-                            Expanded(child: _AnalyticCard(title: 'RESOLUTION RATE', value: _successRate, trend: '-', isPositive: true)),
+                            Expanded(child: _AnalyticCard(title: 'TOTAL INCIDENT', value: '${_incidents.length}', trend: '-', isPositive: true)),
+                            const SizedBox(width: 16),
+                            Expanded(child: _AnalyticCard(title: 'UNASSIGNED', value: '$_unassignedCount', trend: '-', isPositive: true)),
+                            const SizedBox(width: 16),
+                            Expanded(child: _AnalyticCard(title: 'IN PROGRESS', value: '$_inProgressCount', trend: '-', isPositive: true)),
+                            const SizedBox(width: 16),
+                            Expanded(child: _AnalyticCard(title: 'RESOLVED', value: '$_totalResolved', trend: '-', isPositive: true)),
+                            const SizedBox(width: 16),
+                            Expanded(child: _AnalyticCard(title: 'CANCELLED', value: '$_cancelledCount', trend: '-', isPositive: false)),
                           ],
                         ),
                         const SizedBox(height: 40),
@@ -244,12 +285,12 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen> {
                                       icon: Icon(Icons.keyboard_arrow_down, color: AppTheme.headingColor, size: 18),
                                       isDense: true,
                                       style: TextStyle(color: AppTheme.headingColor, fontWeight: FontWeight.w700),
-                                      items: ['All Statuses', 'Pending', 'En Route', 'On Scene', 'Resolved', 'Cancelled'].map((String value) {
+                                      items: ['All Statuses', 'Unassigned', 'En Route', 'On Scene', 'Resolved', 'Cancelled'].map((String value) {
                                         return DropdownMenuItem<String>(value: value, child: Text(value));
                                       }).toList(),
                                       onChanged: (val) {
                                         if (val != null) setState(() {
-                                          _selectedStatus = val == 'All Statuses' ? val : val.toUpperCase().replaceAll(' ', '_');
+                                          _selectedStatus = val;
                                         });
                                       },
                                     ),
@@ -305,16 +346,21 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen> {
                                 child: Row(
                                   children: [
                                     Expanded(flex: 2, child: _TableHeader('INCIDENT ID')),
-                                    Expanded(flex: 3, child: _TableHeader('CATEGORY & TITLE')),
-                                    Expanded(flex: 2, child: _TableHeader('LOCATION')),
+                                    Expanded(flex: 2, child: _TableHeader('CATEGORY')),
+                                    Expanded(flex: 3, child: _TableHeader('LOCATION')),
                                     Expanded(flex: 2, child: _TableHeader('STATUS')),
                                     Expanded(flex: 2, child: _TableHeader('DISPATCHED UNIT')),
-                                    Expanded(flex: 1, child: _TableHeader('TIME')),
+                                    Expanded(flex: 2, child: _TableHeader('TIME')),
                                   ],
                                 ),
                               ),
                               // Rows
-                                ...filteredIncidents.map((inc) {
+                              Container(
+                                constraints: const BoxConstraints(maxHeight: 500),
+                                child: SingleChildScrollView(
+                                  child: Column(
+                                    children: [
+                                      ...filteredIncidents.map((inc) {
                                 final isSelected = _selectedIncident == inc;
                                 final isCritical = inc['type'] == 'MEDICAL' || inc['type'] == 'FIRE';
                                 
@@ -339,25 +385,19 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen> {
                                             child: Text(inc['id'], style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF4B5563))),
                                           ),
                                           Expanded(
-                                            flex: 3,
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  inc['type'],
-                                                  style: TextStyle(
-                                                    color: isCritical ? const Color(0xFFDC2626) : const Color(0xFF6B7280),
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.w900,
-                                                    letterSpacing: 0.5,
-                                                  ),
-                                                ),
-                                                Text(inc['title'], style: const TextStyle(fontWeight: FontWeight.w700, color: AppTheme.headingColor)),
-                                              ],
+                                            flex: 2,
+                                            child: Text(
+                                              inc['type'],
+                                              style: TextStyle(
+                                                color: _getCategoryColor(inc['type']),
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w900,
+                                                letterSpacing: 0.5,
+                                              ),
                                             ),
                                           ),
                                           Expanded(
-                                            flex: 2,
+                                            flex: 3,
                                             child: Row(
                                               children: [
                                                 const Icon(Icons.location_on, size: 14, color: Color(0xFF6B7280)),
@@ -373,13 +413,13 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen> {
                                               child: Container(
                                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                                 decoration: BoxDecoration(
-                                                  color: inc['status'] == 'RESOLVED' ? const Color(0xFFD1FAE5) : const Color(0xFFFEE2E2),
+                                                  color: inc['status'] == 'RESOLVED' ? const Color(0xFFD1FAE5) : inc['status'] == 'UNASSIGNED' ? const Color(0xFFF3F4F6) : inc['status'] == 'EN_ROUTE' || inc['status'] == 'ON_SCENE' ? const Color(0xFFDBEAFE) : const Color(0xFFFEE2E2),
                                                   borderRadius: BorderRadius.circular(12),
                                                 ),
                                                 child: Text(
                                                   inc['status'],
                                                   style: TextStyle(
-                                                    color: inc['status'] == 'RESOLVED' ? const Color(0xFF10B981) : const Color(0xFFDC2626),
+                                                    color: inc['status'] == 'RESOLVED' ? const Color(0xFF10B981) : inc['status'] == 'UNASSIGNED' ? const Color(0xFF6B7280) : inc['status'] == 'EN_ROUTE' || inc['status'] == 'ON_SCENE' ? const Color(0xFF3B82F6) : const Color(0xFFDC2626),
                                                     fontWeight: FontWeight.w800,
                                                     fontSize: 10,
                                                     letterSpacing: 0.5,
@@ -393,15 +433,19 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen> {
                                             child: Text(inc['unit'], style: const TextStyle(color: Color(0xFF4B5563))),
                                           ),
                                           Expanded(
-                                            flex: 1,
-                                            child: Text(inc['time'], style: const TextStyle(color: Color(0xFF6B7280))),
+                                            flex: 2,
+                                            child: Text(inc['time'], style: const TextStyle(color: Color(0xFF6B7280), fontSize: 11)),
                                           ),
                                         ],
                                       ),
                                     ),
                                   ),
                                 );
-                              }),
+                              }).toList(),
+                                    ],
+                                  ),
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -457,12 +501,12 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen> {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: _selectedIncident!['status'] == 'RESOLVED' ? const Color(0xFFD1FAE5) : const Color(0xFFFEE2E2),
+                                  color: _selectedIncident!['status'] == 'RESOLVED' ? const Color(0xFFD1FAE5) : _selectedIncident!['status'] == 'UNASSIGNED' ? const Color(0xFFF3F4F6) : _selectedIncident!['status'] == 'EN_ROUTE' || _selectedIncident!['status'] == 'ON_SCENE' ? const Color(0xFFDBEAFE) : const Color(0xFFFEE2E2),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Text(
                                   _selectedIncident!['status'],
-                                  style: TextStyle(color: _selectedIncident!['status'] == 'RESOLVED' ? const Color(0xFF10B981) : const Color(0xFFDC2626), fontWeight: FontWeight.w800, fontSize: 10, letterSpacing: 0.5),
+                                  style: TextStyle(color: _selectedIncident!['status'] == 'RESOLVED' ? const Color(0xFF10B981) : _selectedIncident!['status'] == 'UNASSIGNED' ? const Color(0xFF6B7280) : _selectedIncident!['status'] == 'EN_ROUTE' || _selectedIncident!['status'] == 'ON_SCENE' ? const Color(0xFF3B82F6) : const Color(0xFFDC2626), fontWeight: FontWeight.w800, fontSize: 10, letterSpacing: 0.5),
                                 ),
                               ),
                             ],
@@ -581,6 +625,7 @@ class _TableHeader extends StatelessWidget {
 }
 
 class _DetailItem extends StatelessWidget {
+
   final String label;
   final String value;
 
