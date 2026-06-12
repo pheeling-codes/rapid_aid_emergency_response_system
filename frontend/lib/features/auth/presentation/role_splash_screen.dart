@@ -3,6 +3,9 @@ import 'package:go_router/go_router.dart';
 
 import '../domain/auth_enums.dart';
 import '../../../core/widgets/base_splash_page.dart';
+import '../../../core/state/data_sync_bloc.dart';
+import '../../../core/state/data_sync_event.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 /// Stage 3: Role-Specific Loading Splash
 /// Shows the Rapid Aid branding with the role-specific portal label
@@ -37,6 +40,9 @@ class _RoleSplashScreenState extends State<RoleSplashScreen>
       curve: Curves.easeIn,
     );
     _fadeController.forward();
+
+    // Trigger initial state caching
+    context.read<DataSyncBloc>().add(const DataSyncTriggered(isSilent: false));
 
     // Auto-redirect to dashboard after exactly 2 seconds
     Future.delayed(const Duration(seconds: 2), () {

@@ -5,8 +5,8 @@ import '../../../core/widgets/rapid_aid_logo.dart';
 import '../../../core/widgets/notification_checker.dart';
 
 class AdminShell extends StatefulWidget {
-  final Widget child;
-  const AdminShell({super.key, required this.child});
+  final StatefulNavigationShell navigationShell;
+  const AdminShell({super.key, required this.navigationShell});
 
   @override
   State<AdminShell> createState() => _AdminShellState();
@@ -18,18 +18,16 @@ class _AdminShellState extends State<AdminShell> {
 
   @override
   Widget build(BuildContext context) {
-    final location = GoRouterState.of(context).uri.path;
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
-    if (location.startsWith('/admin/dashboard')) {
-      _selectedIndex = 0;
-    } else if (location.startsWith('/admin/units')) {
-      _selectedIndex = 1;
-    } else if (location.startsWith('/admin/incidents')) {
-      _selectedIndex = 2;
-    } else if (location.startsWith('/admin/settings')) {
-      _selectedIndex = 3;
+    _selectedIndex = widget.navigationShell.currentIndex;
+
+    void goBranch(int index) {
+      widget.navigationShell.goBranch(
+        index,
+        initialLocation: index == widget.navigationShell.currentIndex,
+      );
     }
 
     return NotificationChecker(
@@ -69,7 +67,7 @@ class _AdminShellState extends State<AdminShell> {
                         label: 'DASHBOARD',
                         isSelected: _selectedIndex == 0,
                         isExpanded: _isExpanded,
-                        onTap: () => context.go('/admin/dashboard'),
+                        onTap: () => goBranch(0),
                         theme: theme,
                       ),
                       _NavItem(
@@ -77,7 +75,7 @@ class _AdminShellState extends State<AdminShell> {
                         label: 'UNITS',
                         isSelected: _selectedIndex == 1,
                         isExpanded: _isExpanded,
-                        onTap: () => context.go('/admin/units'),
+                        onTap: () => goBranch(1),
                         theme: theme,
                       ),
                       _NavItem(
@@ -85,7 +83,7 @@ class _AdminShellState extends State<AdminShell> {
                         label: 'INCIDENTS',
                         isSelected: _selectedIndex == 2,
                         isExpanded: _isExpanded,
-                        onTap: () => context.go('/admin/incidents'),
+                        onTap: () => goBranch(2),
                         theme: theme,
                       ),
                       const Spacer(),
@@ -94,7 +92,7 @@ class _AdminShellState extends State<AdminShell> {
                         label: 'SETTINGS',
                         isSelected: _selectedIndex == 3,
                         isExpanded: _isExpanded,
-                        onTap: () => context.go('/admin/settings'),
+                        onTap: () => goBranch(3),
                         theme: theme,
                         activeColor: const Color(0xFFDC2626), // Red color for settings
                       ),
@@ -137,7 +135,7 @@ class _AdminShellState extends State<AdminShell> {
               ),
             ),
             // ── Main Content ──────────────────────────────────────────────────
-            Expanded(child: widget.child),
+            Expanded(child: widget.navigationShell),
           ],
         ),
       ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -231,28 +232,44 @@ class AppRouter {
       ),
 
       // ── Stage 4c: Admin Shell ──
-      ShellRoute(
-        builder: (context, state, child) => AdminShell(child: child),
-        routes: [
-          GoRoute(
-            path: '/admin',
-            redirect: (context, state) => '/admin/dashboard',
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) => AdminShell(navigationShell: navigationShell),
+        branches: [
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/admin',
+                redirect: (context, state) => '/admin/dashboard',
+              ),
+              GoRoute(
+                path: '/admin/dashboard',
+                builder: (context, state) => const AdminDashboardScreen(),
+              ),
+            ],
           ),
-          GoRoute(
-            path: '/admin/dashboard',
-            builder: (context, state) => const AdminDashboardScreen(),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/admin/units',
+                builder: (context, state) => const AdminUnitsScreen(),
+              ),
+            ],
           ),
-          GoRoute(
-            path: '/admin/units',
-            builder: (context, state) => const AdminUnitsScreen(),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/admin/incidents',
+                builder: (context, state) => const AdminIncidentsScreen(),
+              ),
+            ],
           ),
-          GoRoute(
-            path: '/admin/incidents',
-            builder: (context, state) => const AdminIncidentsScreen(),
-          ),
-          GoRoute(
-            path: '/admin/settings',
-            builder: (context, state) => const AdminSettingsScreen(),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/admin/settings',
+                builder: (context, state) => const AdminSettingsScreen(),
+              ),
+            ],
           ),
         ],
       ),
@@ -294,6 +311,11 @@ class AppRouter {
 
     // Unauthenticated trying to access protected route
     if (!isAuthenticated && !isPublicRoute && !isRoleSplash) {
+      return '/login';
+    }
+
+    // Web-specific guardrail: Bypassing splash/citizen workflows directly to login for web
+    if (kIsWeb && !isAuthenticated && location == '/splash') {
       return '/login';
     }
 

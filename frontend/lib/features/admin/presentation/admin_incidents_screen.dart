@@ -158,10 +158,49 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen> {
       return true;
     }).toList();
 
-    return Scaffold(
-      backgroundColor: cs.surfaceContainerLowest,
-      body: Row(
-        children: [
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 800) {
+          return Scaffold(
+            backgroundColor: cs.surface,
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.desktop_mac_rounded, size: 64, color: cs.primary.withOpacity(0.5)),
+                    const SizedBox(height: 24),
+                    Text(
+                      'COMMAND CENTER ACCESS RESTRICTED',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.2,
+                        color: cs.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'PLEASE USE A DESKTOP TERMINAL.',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: cs.onSurface.withOpacity(0.6),
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
+        return Scaffold(
+          backgroundColor: cs.surfaceContainerLowest,
+          body: Row(
+            children: [
           // ── Main Content Area ───────────────────────────────────────────────
           Expanded(
             child: Column(
@@ -553,6 +592,8 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen> {
             ),
         ],
       ),
+    );
+      },
     );
   }
 }

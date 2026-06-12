@@ -15,6 +15,7 @@ import 'features/auth/data/token_storage.dart';
 import 'features/auth/data/auth_repository.dart';
 import 'features/auth/logic/auth_bloc.dart';
 import 'features/auth/logic/auth_event.dart';
+import 'core/state/data_sync_bloc.dart';
 
 final getIt = GetIt.instance;
 
@@ -70,12 +71,14 @@ class RapidAidApp extends StatefulWidget {
 
 class _RapidAidAppState extends State<RapidAidApp> {
   late final AuthBloc _authBloc;
+  late final DataSyncBloc _dataSyncBloc;
   late final AppRouter _appRouter;
 
   @override
   void initState() {
     super.initState();
     _authBloc = AuthBloc(authRepository: getIt<AuthRepository>());
+    _dataSyncBloc = DataSyncBloc();
 
     // Wire the interceptor's session expiry → AuthBloc logout
     getIt<NetworkClient>().authInterceptor.onSessionExpired = () {
@@ -88,6 +91,7 @@ class _RapidAidAppState extends State<RapidAidApp> {
   @override
   void dispose() {
     _authBloc.close();
+    _dataSyncBloc.close();
     super.dispose();
   }
 
@@ -96,6 +100,7 @@ class _RapidAidAppState extends State<RapidAidApp> {
     return MultiBlocProvider(
       providers: [
         BlocProvider<AuthBloc>.value(value: _authBloc),
+        BlocProvider<DataSyncBloc>.value(value: _dataSyncBloc),
       ],
       child: MaterialApp.router(
         title: 'Rapid Aid',
