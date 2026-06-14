@@ -142,13 +142,19 @@ if not _gdal_available:
     )
     INSTALLED_APPS = [app for app in INSTALLED_APPS if app != 'django.contrib.gis']
 
+db_config = dj_database_url.config(
+    default=config('DATABASE_URL'),
+    conn_max_age=0,
+    ssl_require=True,
+    engine=_db_engine,
+)
+
+# CRITICAL FIX: Supabase transaction poolers (port 6543) do not support 
+# server-side cursors. This causes random 500 Server Errors on Render.
+db_config['DISABLE_SERVER_SIDE_CURSORS'] = True
+
 DATABASES = {
-    'default': dj_database_url.config(
-        default=config('DATABASE_URL'),
-        conn_max_age=0,
-        ssl_require=True,
-        engine=_db_engine,
-    )
+    'default': db_config
 }
 # Supabase requires SSL, so we set ssl_require=True and ensure engine is postgis.
 
