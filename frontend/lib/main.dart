@@ -16,6 +16,7 @@ import 'features/auth/data/auth_repository.dart';
 import 'features/auth/logic/auth_bloc.dart';
 import 'features/auth/logic/auth_event.dart';
 import 'core/state/data_sync_bloc.dart';
+import 'core/state/data_sync_event.dart';
 
 final getIt = GetIt.instance;
 
@@ -82,6 +83,7 @@ class _RapidAidAppState extends State<RapidAidApp> {
 
     // Wire the interceptor's session expiry → AuthBloc logout
     getIt<NetworkClient>().authInterceptor.onSessionExpired = () {
+      _dataSyncBloc.add(DataSyncStopPolling());
       _authBloc.add(const AuthLogoutRequested());
     };
 

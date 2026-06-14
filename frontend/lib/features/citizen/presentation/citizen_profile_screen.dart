@@ -9,6 +9,8 @@ import '../../auth/logic/auth_event.dart';
 import '../../../main.dart';
 import '../../../core/network/network_client.dart';
 import '../../auth/data/token_storage.dart';
+import '../../../core/state/data_sync_bloc.dart';
+import '../../../core/state/data_sync_event.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 // ignore: avoid_web_libraries_in_flutter
@@ -90,11 +92,22 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
         }
       }
 
-      final reportsRes = await client.get('/incidents/');
-      if (reportsRes.data != null) {
-        final dataList = (reportsRes.data is List)
+      final cachedReports = context.read<DataSyncBloc>().state.allReports;
+      final List<dynamic> dataList;
+      
+      if (cachedReports.isNotEmpty) {
+        dataList = cachedReports;
+        context.read<DataSyncBloc>().add(const DataSyncTriggered(isSilent: true));
+      } else {
+        final reportsRes = await client.get('/incidents/');
+        dataList = (reportsRes.data != null && reportsRes.data is List)
             ? reportsRes.data as List
-            : reportsRes.data['results'] as List? ?? [];
+            : (reportsRes.data != null && reportsRes.data['results'] != null)
+                ? reportsRes.data['results'] as List
+                : [];
+      }
+      
+      if (dataList.isNotEmpty || cachedReports.isNotEmpty) {
         if (mounted) {
           setState(() {
             _totalReports = dataList.length;
@@ -258,6 +271,7 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
+              context.read<DataSyncBloc>().add(DataSyncStopPolling());
               context.read<AuthBloc>().add(const AuthLogoutRequested());
               context.go('/login');
             },

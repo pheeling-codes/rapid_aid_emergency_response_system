@@ -8,6 +8,8 @@ import '../../../core/theme/theme.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../auth/logic/auth_bloc.dart';
 import '../../auth/logic/auth_event.dart';
+import '../../../core/state/data_sync_bloc.dart';
+import '../../../core/state/data_sync_event.dart';
 
 class AdminSettingsScreen extends StatefulWidget {
   const AdminSettingsScreen({super.key});
@@ -41,6 +43,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
+              context.read<DataSyncBloc>().add(DataSyncStopPolling());
               context.read<AuthBloc>().add(const AuthLogoutRequested());
               context.go('/login');
             },

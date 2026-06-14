@@ -4,6 +4,9 @@ import '../../../main.dart';
 import '../../../core/network/network_client.dart';
 import '../../../core/theme/theme.dart';
 import '../../../core/widgets/user_profile_avatar.dart';
+import '../../../core/state/data_sync_bloc.dart';
+import '../../../core/state/data_sync_event.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geocoding/geocoding.dart';
 
 Future<String> _resolveLocation(String? coords) async {
@@ -283,10 +286,17 @@ class _ResponderManagementViewState extends State<_ResponderManagementView> {
   }
 
   Future<void> _fetchResponders() async {
+    final cachedUnits = context.read<DataSyncBloc>().state.units;
+    
     try {
-      final res = await getIt<NetworkClient>().dio.get('/dispatcher/users/');
-      final List<dynamic> results =
-          res.data is List ? res.data : (res.data['results'] ?? []);
+      final List<dynamic> results;
+      if (cachedUnits.isNotEmpty) {
+        results = cachedUnits;
+        context.read<DataSyncBloc>().add(const DataSyncTriggered(isSilent: true));
+      } else {
+        final res = await getIt<NetworkClient>().dio.get('/dispatcher/users/');
+        results = res.data is List ? res.data : (res.data['results'] ?? []);
+      }
       final List<Map<String, dynamic>> temp = [];
       for (var r in results.where((r) => r['role'] == 'RESPONDER')) {
         String statusStr = 'SUSPENDED';
@@ -1079,10 +1089,17 @@ class _UserDirectoryViewState extends State<_UserDirectoryView> {
   }
 
   Future<void> _fetchCitizens() async {
+    final cachedUnits = context.read<DataSyncBloc>().state.units;
+    
     try {
-      final res = await getIt<NetworkClient>().dio.get('/dispatcher/users/');
-      final List<dynamic> results =
-          res.data is List ? res.data : (res.data['results'] ?? []);
+      final List<dynamic> results;
+      if (cachedUnits.isNotEmpty) {
+        results = cachedUnits;
+        context.read<DataSyncBloc>().add(const DataSyncTriggered(isSilent: true));
+      } else {
+        final res = await getIt<NetworkClient>().dio.get('/dispatcher/users/');
+        results = res.data is List ? res.data : (res.data['results'] ?? []);
+      }
       setState(() {
         _citizens = results.where((r) => r['role'] == 'CITIZEN').map((r) {
           String statusStr = 'SUSPENDED';
@@ -1954,10 +1971,17 @@ class _AdminDirectoryViewState extends State<_AdminDirectoryView> {
   }
 
   Future<void> _fetchAdmins() async {
+    final cachedUnits = context.read<DataSyncBloc>().state.units;
+
     try {
-      final res = await getIt<NetworkClient>().dio.get('/dispatcher/users/');
-      final List<dynamic> results =
-          res.data is List ? res.data : (res.data['results'] ?? []);
+      final List<dynamic> results;
+      if (cachedUnits.isNotEmpty) {
+        results = cachedUnits;
+        context.read<DataSyncBloc>().add(const DataSyncTriggered(isSilent: true));
+      } else {
+        final res = await getIt<NetworkClient>().dio.get('/dispatcher/users/');
+        results = res.data is List ? res.data : (res.data['results'] ?? []);
+      }
       setState(() {
         _admins = results.where((r) => r['role'] == 'DISPATCHER').map((r) {
           String statusStr = 'SUSPENDED';

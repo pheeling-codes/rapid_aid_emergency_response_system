@@ -5,6 +5,7 @@ import '../domain/auth_enums.dart';
 import '../../../core/widgets/base_splash_page.dart';
 import '../../../core/state/data_sync_bloc.dart';
 import '../../../core/state/data_sync_event.dart';
+import '../../../core/state/data_sync_state.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 /// Stage 3: Role-Specific Loading Splash
@@ -28,6 +29,9 @@ class _RoleSplashScreenState extends State<RoleSplashScreen>
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
 
+  bool _minTimeElapsed = false;
+  bool _isSyncComplete = false;
+
   @override
   void initState() {
     super.initState();
@@ -42,12 +46,26 @@ class _RoleSplashScreenState extends State<RoleSplashScreen>
     _fadeController.forward();
 
     // Trigger initial state caching
-    context.read<DataSyncBloc>().add(const DataSyncTriggered(isSilent: false));
+    final bloc = context.read<DataSyncBloc>();
+    if (bloc.state.status == DataSyncStatus.success) {
+      _isSyncComplete = true;
+    } else {
+      bloc.add(const DataSyncTriggered(isSilent: false));
+    }
 
-    // Auto-redirect to dashboard after exactly 2 seconds
+    // Minimum 2 seconds splash
     Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) context.go(widget.role.dashboardRoute);
+      if (mounted) {
+        _minTimeElapsed = true;
+        _checkNavigate();
+      }
     });
+  }
+
+  void _checkNavigate() {
+    if (_minTimeElapsed && _isSyncComplete) {
+      context.go(widget.role.dashboardRoute);
+    }
   }
 
   @override
@@ -58,11 +76,19 @@ class _RoleSplashScreenState extends State<RoleSplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: _fadeAnimation,
-      child: BaseSplashPage(
-        centerLabel: widget.role.portalLabel,
-        bottomIndicatorText: widget.role.splashMessage,
+    return BlocListener<DataSyncBloc, DataSyncState>(
+      listener: (context, state) {
+        if (state.status == DataSyncStatus.success || state.status == DataSyncStatus.failure) {
+          _isSyncComplete = true;
+          _checkNavigate();
+        }
+      },
+      child: FadeTransition(
+        opacity: _fadeAnimation,
+        child: BaseSplashPage(
+          centerLabel: widget.role.portalLabel,
+          bottomIndicatorText: widget.role.splashMessage,
+        ),
       ),
     );
   }

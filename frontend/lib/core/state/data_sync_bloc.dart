@@ -33,21 +33,35 @@ class DataSyncBloc extends Bloc<DataSyncEvent, DataSyncState> {
       final results = await Future.wait([
         dio.get('/auth/me/'), // User profile
         dio.get('/incidents/', queryParameters: {'feed': 'global'}), // Active emergency feed
+        dio.get('/incidents/'), // All reports
+        dio.get('/dispatcher/users/'), // Units
         _getCurrentLocation(), // GPS
       ]);
 
       final profileRes = results[0] as Response;
       final incidentRes = results[1] as Response;
-      final position = results[2] as Position?;
+      final allReportsRes = results[2] as Response;
+      final unitsRes = results[3] as Response;
+      final position = results[4] as Position?;
 
       final emergencies = (incidentRes.data is List) 
           ? incidentRes.data as List 
           : incidentRes.data['results'] ?? [];
+          
+      final allReports = (allReportsRes.data is List)
+          ? allReportsRes.data as List
+          : allReportsRes.data['results'] ?? [];
+          
+      final units = (unitsRes.data is List)
+          ? unitsRes.data as List
+          : unitsRes.data['results'] ?? [];
 
       emit(state.copyWith(
         status: DataSyncStatus.success,
         profile: profileRes.data as Map<String, dynamic>,
         activeEmergencies: emergencies,
+        allReports: allReports,
+        units: units,
         currentLocation: position,
       ));
 

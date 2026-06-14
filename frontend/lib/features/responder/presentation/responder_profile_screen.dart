@@ -14,6 +14,8 @@ import '../../../main.dart';
 import '../../auth/data/token_storage.dart';
 import '../../auth/logic/auth_bloc.dart';
 import '../../auth/logic/auth_event.dart';
+import '../../../core/state/data_sync_bloc.dart';
+import '../../../core/state/data_sync_event.dart';
 
 /// Responder Profile Screen
 /// Premium profile with stats, duty toggle, credentials and session controls.
@@ -291,6 +293,7 @@ class _ResponderProfileScreenState extends State<ResponderProfileScreen> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
+              context.read<DataSyncBloc>().add(DataSyncStopPolling());
               context.read<AuthBloc>().add(const AuthLogoutRequested());
               context.go('/login');
             },

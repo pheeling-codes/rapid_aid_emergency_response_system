@@ -4,6 +4,9 @@ import '../../../core/widgets/status_chip.dart';
 import '../../../core/network/network_client.dart';
 import '../../../main.dart';
 import '../../../core/widgets/user_profile_avatar.dart';
+import '../../../core/state/data_sync_bloc.dart';
+import '../../../core/state/data_sync_event.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 class AdminIncidentsScreen extends StatefulWidget {
   const AdminIncidentsScreen({super.key});
@@ -35,10 +38,19 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen> {
   }
 
   Future<void> _fetchIncidents() async {
+    final cachedReports = context.read<DataSyncBloc>().state.allReports;
+    
     try {
-      final res = await getIt<NetworkClient>().dio.get('/incidents/');
+      final List<dynamic> results;
+      if (cachedReports.isNotEmpty) {
+        results = cachedReports;
+        context.read<DataSyncBloc>().add(const DataSyncTriggered(isSilent: true));
+      } else {
+        final res = await getIt<NetworkClient>().dio.get('/incidents/');
+        results = res.data is List ? res.data : (res.data['results'] ?? []);
+      }
+      
       if (mounted) {
-        final List<dynamic> results = res.data is List ? res.data : (res.data['results'] ?? []);
         
         int resolvedCount = 0;
         int inProgressCount = 0;
