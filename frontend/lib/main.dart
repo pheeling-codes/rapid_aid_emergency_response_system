@@ -32,7 +32,8 @@ Future<void> _initDependencies() async {
   getIt.registerSingleton<TokenStorage>(tokenStorage);
 
   // Network Client (Dio + AuthInterceptor)
-  final networkClient = NetworkClient(tokenStorage: tokenStorage);
+  final baseUrl = dotenv.env['BACKEND_URL'] ?? 'http://127.0.0.1:8000/api';
+  final networkClient = NetworkClient(tokenStorage: tokenStorage, baseUrl: baseUrl);
   getIt.registerSingleton<NetworkClient>(networkClient);
 
   // Auth Repository
