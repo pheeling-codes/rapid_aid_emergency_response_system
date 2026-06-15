@@ -24,6 +24,10 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 # Copy the Django project
 COPY . /app/
 
+# Provide dummy variables so Django doesn't crash during the isolated build phase
+ENV SECRET_KEY="dummy-key-for-build"
+ENV DATABASE_URL="sqlite:///dummy.db"
+
 # Collect static files
 RUN python manage.py collectstatic --noinput
 
