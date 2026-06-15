@@ -149,6 +149,7 @@ class _CitizenProfileScreenState extends State<CitizenProfileScreen> {
       }
 
       if (mounted) {
+        context.read<DataSyncBloc>().add(const DataSyncTriggered(isSilent: true));
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Profile saved successfully'),

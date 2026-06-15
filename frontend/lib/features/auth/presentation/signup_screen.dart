@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme/theme.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
@@ -63,7 +64,7 @@ class _SignupScreenState extends State<SignupScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(state.successMessage ?? 'Account Created'),
-              backgroundColor: Colors.green.shade700,
+              backgroundColor: AppTheme.primary,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),

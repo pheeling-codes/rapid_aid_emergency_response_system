@@ -191,7 +191,7 @@ class _ConfirmDispatchState extends State<ConfirmDispatch> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Emergency dispatched successfully.'),
-            backgroundColor: Colors.green.shade700,
+            backgroundColor: AppTheme.primary,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -350,7 +350,7 @@ class _ConfirmDispatchState extends State<ConfirmDispatch> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(Icons.check_circle,
-                              size: 14, color: Colors.green.shade700),
+                              size: 14, color: AppTheme.primary),
                           const SizedBox(width: 8),
                           Text(
                             'GPS FIX: HIGH ACCURACY',
@@ -643,7 +643,7 @@ class _ConfirmDispatchState extends State<ConfirmDispatch> {
                                               width: 8,
                                               height: 8,
                                               decoration: BoxDecoration(
-                                                color: Colors.green.shade500,
+                                                color: AppTheme.primary,
                                                 shape: BoxShape.circle,
                                               ),
                                             ),

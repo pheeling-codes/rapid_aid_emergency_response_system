@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../../core/theme/theme.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -139,7 +140,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('A new code has been sent to ${widget.email}'),
-              backgroundColor: Colors.green.shade700,
+              backgroundColor: AppTheme.primary,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),

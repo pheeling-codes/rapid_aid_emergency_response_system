@@ -98,7 +98,7 @@ class _CitizenReportDetailState extends State<CitizenReportDetail> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Emergency cancelled successfully.'),
-            backgroundColor: Colors.green.shade700,
+            backgroundColor: AppTheme.primary,
             behavior: SnackBarBehavior.floating,
           ),
         );

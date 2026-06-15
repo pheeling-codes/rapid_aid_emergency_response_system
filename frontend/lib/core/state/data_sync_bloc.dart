@@ -29,12 +29,25 @@ class DataSyncBloc extends Bloc<DataSyncEvent, DataSyncState> {
     try {
       final dio = getIt<NetworkClient>().dio;
       
+      // Helper function to swallow 403s and non-critical errors so parallel sync doesn't crash
+      Future<Response> safeGet(String path, {Map<String, dynamic>? queryParameters}) async {
+        try {
+          return await dio.get(path, queryParameters: queryParameters);
+        } on DioException catch (e) {
+          if (e.response?.statusCode == 403 || e.response?.statusCode == 401) {
+            // If forbidden/unauthorized, just return an empty response so the app still loads
+            return Response(requestOptions: e.requestOptions, statusCode: e.response?.statusCode, data: []);
+          }
+          rethrow; // Rethrow other critical errors (like 500s or network drops)
+        }
+      }
+
       // Parallel fetches for speed
       final results = await Future.wait([
-        dio.get('/auth/me/'), // User profile
-        dio.get('/incidents/', queryParameters: {'feed': 'global'}), // Active emergency feed
-        dio.get('/incidents/'), // All reports
-        dio.get('/dispatcher/users/'), // Units
+        safeGet('/auth/me/'), // User profile
+        safeGet('/incidents/', queryParameters: {'feed': 'global'}), // Active emergency feed
+        safeGet('/incidents/'), // All reports
+        safeGet('/dispatcher/users/'), // Units
         _getCurrentLocation(), // GPS
       ]);
 
@@ -55,6 +68,11 @@ class DataSyncBloc extends Bloc<DataSyncEvent, DataSyncState> {
       final units = (unitsRes.data is List)
           ? unitsRes.data as List
           : unitsRes.data['results'] ?? [];
+          
+      // Check if profile actually loaded, if it's empty due to 401/403, we should fail
+      if (profileRes.data == null || (profileRes.data is List && (profileRes.data as List).isEmpty)) {
+         throw Exception("Failed to load user profile");
+      }
 
       emit(state.copyWith(
         status: DataSyncStatus.success,

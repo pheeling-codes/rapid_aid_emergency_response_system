@@ -113,10 +113,11 @@ class _ResponderProfileScreenState extends State<ResponderProfileScreen> {
       }
 
       if (mounted) {
+        context.read<DataSyncBloc>().add(const DataSyncTriggered(isSilent: true));
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
               content: Text('Profile updated successfully'),
-              backgroundColor: Colors.green),
+              backgroundColor: AppTheme.primary),
         );
       }
     } catch (e) {

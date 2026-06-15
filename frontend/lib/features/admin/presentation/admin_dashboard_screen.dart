@@ -168,7 +168,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('${selectedUnit['name']} dispatched successfully!'),
-            backgroundColor: const Color(0xFF10B981),
+            backgroundColor: AppTheme.primary,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),

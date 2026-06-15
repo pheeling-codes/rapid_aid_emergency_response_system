@@ -283,7 +283,7 @@ class _ResponderMapScreenState extends State<ResponderMapScreen>
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
                 backgroundColor:
-                    newIndex == 1 ? Colors.green : AppTheme.primary),
+                    newIndex == 1 ? AppTheme.primary : AppTheme.primary),
             child: const Text('Confirm', style: TextStyle(color: Colors.white)),
           ),
         ],
@@ -312,7 +312,7 @@ class _ResponderMapScreenState extends State<ResponderMapScreen>
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
                 content: Text('Incident Resolved successfully'),
-                backgroundColor: Colors.green),
+                backgroundColor: AppTheme.primary),
           );
           context.go('/responder/history');
         }

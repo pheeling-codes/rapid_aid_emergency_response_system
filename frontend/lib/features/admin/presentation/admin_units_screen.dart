@@ -221,27 +221,13 @@ class _AdminUnitsScreenState extends State<AdminUnitsScreen>
 
           // ── Tab Views ─────────────────────────────────────────────────────
           Expanded(
-            child: AnimatedBuilder(
-              animation: _tabController,
-              builder: (context, child) {
-                return PageTransitionSwitcher(
-                  duration: const Duration(milliseconds: 300),
-                  transitionBuilder: (child, animation, secondaryAnimation) {
-                    return FadeThroughTransition(
-                      animation: animation,
-                      secondaryAnimation: secondaryAnimation,
-                      child: child,
-                    );
-                  },
-                  child: _tabController.index == 0
-                      ? _ResponderManagementView(
-                          key: const ValueKey('responder'))
-                      : _tabController.index == 1
-                          ? _UserDirectoryView(key: const ValueKey('citizen'))
-                          : _AdminDirectoryView(
-                              key: const ValueKey('dispatcher')),
-                );
-              },
+            child: TabBarView(
+              controller: _tabController,
+              children: const [
+                _ResponderManagementView(key: ValueKey('responder')),
+                _UserDirectoryView(key: ValueKey('citizen')),
+                _AdminDirectoryView(key: ValueKey('dispatcher')),
+              ],
             ),
           ),
         ],
@@ -262,7 +248,9 @@ class _ResponderManagementView extends StatefulWidget {
       _ResponderManagementViewState();
 }
 
-class _ResponderManagementViewState extends State<_ResponderManagementView> {
+class _ResponderManagementViewState extends State<_ResponderManagementView> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
   String _selectedFilter = 'All';
   String _selectedTimeFilter = 'All Time';
   int? _editingIndex;
@@ -424,7 +412,7 @@ class _ResponderManagementViewState extends State<_ResponderManagementView> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: const Color(0xFF10B981),
+        backgroundColor: AppTheme.primary,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
@@ -433,6 +421,7 @@ class _ResponderManagementViewState extends State<_ResponderManagementView> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
@@ -1065,7 +1054,9 @@ class _UserDirectoryView extends StatefulWidget {
   State<_UserDirectoryView> createState() => _UserDirectoryViewState();
 }
 
-class _UserDirectoryViewState extends State<_UserDirectoryView> {
+class _UserDirectoryViewState extends State<_UserDirectoryView> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
   String _selectedStatusFilter = 'All';
   String _selectedTimeFilter = 'All Time';
 
@@ -1206,7 +1197,7 @@ class _UserDirectoryViewState extends State<_UserDirectoryView> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: const Color(0xFF10B981),
+        backgroundColor: AppTheme.primary,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
@@ -1215,6 +1206,7 @@ class _UserDirectoryViewState extends State<_UserDirectoryView> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
@@ -1949,7 +1941,9 @@ class _AdminDirectoryView extends StatefulWidget {
   State<_AdminDirectoryView> createState() => _AdminDirectoryViewState();
 }
 
-class _AdminDirectoryViewState extends State<_AdminDirectoryView> {
+class _AdminDirectoryViewState extends State<_AdminDirectoryView> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
   String _selectedStatusFilter = 'All';
   String _selectedTimeFilter = 'All Time';
   int? _editingIndex;
@@ -2087,7 +2081,7 @@ class _AdminDirectoryViewState extends State<_AdminDirectoryView> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: const Color(0xFF10B981),
+        backgroundColor: AppTheme.primary,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
@@ -2096,6 +2090,7 @@ class _AdminDirectoryViewState extends State<_AdminDirectoryView> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
