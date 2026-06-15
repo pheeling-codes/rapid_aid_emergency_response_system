@@ -116,37 +116,17 @@ if os.name == 'nt':
                     GEOS_LIBRARY_PATH = geos_dlls[0]
                 break
 
-# Database Setup (PostGIS via dj-database-url)
-# Detect if GDAL is available to pick the right backend
-_gdal_available = 'GDAL_LIBRARY_PATH' in dir() or os.environ.get('GDAL_LIBRARY_PATH')
-if not _gdal_available:
-    # Try to load GDAL to see if it's on the system PATH
-    import ctypes
-    for _gdal_name in ['gdal308', 'gdal307', 'gdal306', 'gdal305', 'gdal304', 'gdal303', 'gdal302', 'gdal301', 'gdal300', 'gdal']:
-        try:
-            ctypes.cdll.LoadLibrary(_gdal_name)
-            _gdal_available = True
-            break
-        except OSError:
-            pass
-
-_db_engine = 'django.contrib.gis.db.backends.postgis' if _gdal_available else 'django.db.backends.postgresql'
-
-if not _gdal_available:
-    # Remove GeoDjango app when GDAL is unavailable (local Windows dev without OSGeo4W)
-    import warnings
-    warnings.warn(
-        "GDAL not found — using plain PostgreSQL backend. GeoDjango spatial features disabled. "
-        "Install OSGeo4W or GDAL to enable full spatial support.",
-        RuntimeWarning
-    )
-    INSTALLED_APPS = [app for app in INSTALLED_APPS if app != 'django.contrib.gis']
+# Spatial Library Failsafes for Docker/Debian Environments
+import platform
+if platform.system() == 'Linux':
+    GDAL_LIBRARY_PATH = '/usr/lib/libgdal.so'
+    GEOS_LIBRARY_PATH = '/usr/lib/x86_64-linux-gnu/libgeos_c.so'
 
 db_config = dj_database_url.config(
     default=config('DATABASE_URL'),
+    engine='django.contrib.gis.db.backends.postgis', # STRICT POSTGIS OVERRIDE
     conn_max_age=0,
     ssl_require=True,
-    engine=_db_engine,
 )
 
 # CRITICAL FIX: Supabase transaction poolers (port 6543) do not support 
