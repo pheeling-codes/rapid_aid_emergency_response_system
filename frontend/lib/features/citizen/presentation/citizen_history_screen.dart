@@ -111,13 +111,13 @@ class _CitizenHistoryScreenState extends State<CitizenHistoryScreen> {
   }
 
   Color _getStatusColor(String? status) {
-    if (status == 'RESOLVED') return AppTheme.primary;
+    if (status == 'RESOLVED') return const Color(0xFF10B981);
     if (status == 'CANCELLED') return Colors.grey.shade700;
     return Colors.orange.shade700;
   }
 
   Color _getStatusBg(String? status) {
-    if (status == 'RESOLVED') return AppTheme.primary;
+    if (status == 'RESOLVED') return const Color(0xFF10B981).withOpacity(0.1);
     if (status == 'CANCELLED') return Colors.grey.shade200;
     return Colors.orange.shade50;
   }
