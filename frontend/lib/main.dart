@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 // ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
+import 'package:universal_html/html.dart' as html;
 
 import 'core/theme/theme.dart';
 import 'core/routing/router_config.dart';
@@ -48,7 +48,7 @@ Future<void> _initDependencies() async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: ".env");
+  await dotenv.load(fileName: "rapid_aid.env");
 
   if (kIsWeb) {
     final apiKey = dotenv.env['GOOGLE_MAPS_API_KEY'];

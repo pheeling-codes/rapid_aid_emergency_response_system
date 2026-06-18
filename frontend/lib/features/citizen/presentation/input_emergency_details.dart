@@ -6,7 +6,7 @@ import '../../../core/widgets/user_profile_avatar.dart';
 import '../../../core/widgets/ambient_shadow.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 // ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
+import 'package:universal_html/html.dart' as html;
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/location_service.dart';

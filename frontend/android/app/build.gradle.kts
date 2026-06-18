@@ -8,7 +8,7 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
-val envFile = file("../../.env")
+val envFile = file("../../rapid_aid.env")
 val envProperties = Properties()
 if (envFile.exists()) {
     envProperties.load(FileInputStream(envFile))
@@ -19,16 +19,13 @@ val mapsApiKey = envProperties.getProperty("GOOGLE_MAPS_API_KEY") ?: ""
 android {
     namespace = "com.example.rapid_aid"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    // ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
 
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
-    }
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
@@ -53,4 +50,10 @@ android {
 
 flutter {
     source = "../.."
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
+    }
 }
